@@ -56,7 +56,7 @@ public class JdbcBridge {
         }
     }
 
-    /** 执行 SQL：复用连接；SELECT 返回结果集，其余返回影响行数 */
+    /** 执行 SQL：复用连接；支持命名参数与日期变量；SELECT 返回结果集，其余返回影响行数 */
     private static void doQuery(Map<String, Object> req, Map<String, Object> resp) throws Exception {
         ensureDriver(str(req.get("jar")));
         String url = str(req.get("url")), user = str(req.get("user"));
@@ -67,9 +67,18 @@ public class JdbcBridge {
             conn = DriverManager.getConnection(url, user, str(req.get("password")));
             POOL.put(key, conn);
         }
-        try (Statement st = conn.createStatement()) {
+        String sql = substituteDateVars(str(req.get("sql")));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> params = req.get("params") instanceof Map ? (Map<String, Object>) req.get("params") : null;
+        Statement st;
+        if (params != null && !params.isEmpty()) {
+            st = prepare(conn, sql, params);
+        } else {
+            st = conn.createStatement();
             st.setQueryTimeout(30);
-            boolean isRs = st.execute(str(req.get("sql")));
+        }
+        try {
+            boolean isRs = st instanceof PreparedStatement ? ((PreparedStatement) st).execute() : st.execute(sql);
             if (isRs) {
                 try (ResultSet rs = st.getResultSet()) {
                     ResultSetMetaData md = rs.getMetaData();
@@ -97,9 +106,68 @@ public class JdbcBridge {
                 resp.put("updateCount", st.getUpdateCount());
             }
             resp.put("ok", true);
+        } finally {
+            st.close();
         }
     }
 
+    /** 命名参数 :name → 位置参数 ?（跳过单引号字符串），并按值形态绑定 */
+    private static PreparedStatement prepare(Connection conn, String sql, Map<String, Object> params) throws SQLException {
+        List<String> order = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        boolean inStr = false;
+        for (int i = 0; i < sql.length(); i++) {
+            char ch = sql.charAt(i);
+            if (ch == '\'') { inStr = !inStr; sb.append(ch); continue; }
+            if (!inStr && ch == ':' && i + 1 < sql.length() && (Character.isLetter(sql.charAt(i + 1)) || sql.charAt(i + 1) == '_')) {
+                int e = i + 1;
+                while (e < sql.length() && (Character.isLetterOrDigit(sql.charAt(e)) || sql.charAt(e) == '_')) e++;
+                order.add(sql.substring(i + 1, e));
+                sb.append('?');
+                i = e - 1;
+                continue;
+            }
+            sb.append(ch);
+        }
+        PreparedStatement ps = conn.prepareStatement(sb.toString());
+        ps.setQueryTimeout(30);
+        for (int i = 0; i < order.size(); i++) {
+            Object v = params.get(order.get(i));
+            setParam(ps, i + 1, v == null ? "" : String.valueOf(v));
+        }
+        return ps;
+    }
+
+    /** 按值形态设置参数：整数→long，小数→double，其余→string */
+    private static void setParam(PreparedStatement ps, int idx, String v) throws SQLException {
+        if (v.matches("-?\\d+")) {
+            try { ps.setLong(idx, Long.parseLong(v)); return; } catch (NumberFormatException ignored) {}
+        }
+        if (v.matches("-?\\d+\\.\\d+")) {
+            try { ps.setDouble(idx, Double.parseDouble(v)); return; } catch (NumberFormatException ignored) {}
+        }
+        ps.setString(idx, v);
+    }
+
+    /** 日期变量：$zt=昨天，$syd=上月底，替换为带单引号的 'yyyy-MM-dd'（跳过单引号字符串） */
+    private static String substituteDateVars(String sql) {
+        if (!sql.contains("$")) return sql;
+        java.time.LocalDate t = java.time.LocalDate.now();
+        String zt = "'" + t.minusDays(1) + "'";
+        String syd = "'" + t.withDayOfMonth(1).minusDays(1) + "'";
+        StringBuilder sb = new StringBuilder();
+        boolean inStr = false;
+        for (int i = 0; i < sql.length(); i++) {
+            char ch = sql.charAt(i);
+            if (ch == '\'') { inStr = !inStr; sb.append(ch); continue; }
+            if (!inStr && ch == '$') {
+                if (sql.startsWith("$syd", i)) { sb.append(syd); i += 3; continue; }
+                if (sql.startsWith("$zt", i)) { sb.append(zt); i += 2; continue; }
+            }
+            sb.append(ch);
+        }
+        return sb.toString();
+    }
     /** 加载 jar 并通过 DriverShim 注册驱动（每个 jar 只注册一次） */
     private static void ensureDriver(String jarPath) throws Exception {
         if (REGISTERED.contains(jarPath)) return;

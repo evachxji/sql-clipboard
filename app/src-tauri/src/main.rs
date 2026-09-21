@@ -1,4 +1,4 @@
-﻿#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
@@ -28,6 +28,13 @@ struct Conn {
     url: String,
     user: String,
     password: String,
+}
+
+#[derive(Serialize)]
+struct Preset {
+    id: i64,
+    name: String,
+    sql: String,
 }
 
 #[derive(Serialize)]
@@ -98,6 +105,15 @@ fn open() -> Result<Connection, String> {
     .map_err(|e| e.to_string())?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT NOT NULL)",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS presets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            sql TEXT NOT NULL
+        )",
         [],
     )
     .map_err(|e| e.to_string())?;
@@ -415,6 +431,61 @@ fn delete_connection(id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn list_presets() -> Result<Vec<Preset>, String> {
+    let conn = open()?;
+    let mut stmt = conn.prepare("SELECT id, name, sql FROM presets ORDER BY id").map_err(|e| e.to_string())?;
+    let list = stmt
+        .query_map([], |r| Ok(Preset { id: r.get(0)?, name: r.get(1)?, sql: r.get(2)? }))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(list)
+}
+
+#[tauri::command]
+fn save_preset(id: Option<i64>, name: String, sql: String) -> Result<i64, String> {
+    let conn = open()?;
+    match id {
+        Some(i) => {
+            conn.execute("UPDATE presets SET name=?1, sql=?2 WHERE id=?3", (name, sql, i)).map_err(|e| e.to_string())?;
+            Ok(i)
+        }
+        None => {
+            conn.execute("INSERT INTO presets (name, sql) VALUES (?1, ?2)", (name, sql)).map_err(|e| e.to_string())?;
+            Ok(conn.last_insert_rowid())
+        }
+    }
+}
+
+#[tauri::command]
+fn delete_preset(id: i64) -> Result<(), String> {
+    open()?.execute("DELETE FROM presets WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 导入预设：JSON 文件，格式 [{"name":"...","sql":"..."}]，返回导入条数
+#[tauri::command]
+fn import_presets() -> Result<i64, String> {
+    let Some(f) = rfd::FileDialog::new().add_filter("预设 SQL", &["json"]).pick_file() else {
+        return Ok(0);
+    };
+    let text = std::fs::read_to_string(&f).map_err(|e| e.to_string())?;
+    let arr: Vec<Value> = serde_json::from_str(&text).map_err(|e| format!("JSON 解析失败: {e}"))?;
+    let conn = open()?;
+    let mut count = 0i64;
+    for item in &arr {
+        let name = item["name"].as_str().unwrap_or_default().trim();
+        let sql = item["sql"].as_str().unwrap_or_default().trim();
+        if name.is_empty() || sql.is_empty() {
+            continue;
+        }
+        conn.execute("INSERT INTO presets (name, sql) VALUES (?1, ?2)", (name, sql)).map_err(|e| e.to_string())?;
+        count += 1;
+    }
+    Ok(count)
+}
+
+#[tauri::command]
 fn test_connection(jar: String, url: String, user: String, password: String) -> TestResult {
     let req = json!({"cmd": "test", "jar": jar, "url": url, "user": user, "password": password});
     match bridge_call(req) {
@@ -428,9 +499,14 @@ fn test_connection(jar: String, url: String, user: String, password: String) -> 
 }
 
 #[tauri::command]
-fn execute_query(jar: String, url: String, user: String, password: String, sql: String) -> QueryResult {
+fn execute_query(jar: String, url: String, user: String, password: String, sql: String, params: Option<std::collections::HashMap<String, String>>) -> QueryResult {
     let fail = |e: String| QueryResult { ok: false, columns: vec![], rows: vec![], truncated: false, update_count: -1, elapsed_ms: 0, error: e };
-    let req = json!({"cmd": "query", "jar": jar, "url": url, "user": user, "password": password, "sql": sql, "maxRows": 1000});
+    let mut req = json!({"cmd": "query", "jar": jar, "url": url, "user": user, "password": password, "sql": sql, "maxRows": 1000});
+    if let Some(p) = params {
+        if !p.is_empty() {
+            req["params"] = json!(p);
+        }
+    }
     match bridge_call(req) {
         Ok(v) => {
             if !v["ok"].as_bool().unwrap_or(false) {
@@ -463,6 +539,7 @@ fn main() {
             load_cells, add_cell, insert_cell, update_cell, delete_cell, copy_text,
             get_java_info, set_java_path, pick_jar,
             save_connection, list_connections, delete_connection,
+            list_presets, save_preset, delete_preset, import_presets,
             test_connection, execute_query
         ])
         .run(tauri::generate_context!())

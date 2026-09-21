@@ -1,0 +1,9 @@
+[
+  {"name": "查用户信息-按客户号", "sql": "SELECT * FROM core.kehu WHERE cust_no = :cust_no"},
+  {"name": "查用户信息-按身份证", "sql": "SELECT * FROM core.kehu WHERE id_card = :id_card"},
+  {"name": "查用户信息-按手机号", "sql": "SELECT * FROM core.kehu WHERE phone = :phone"},
+  {"name": "查用户贷款-按客户号", "sql": "SELECT * FROM core.daikuan WHERE cust_no = :cust_no"},
+  {"name": "查用户贷款-按身份证", "sql": "SELECT * FROM core.daikuan WHERE id_card = :id_card"},
+  {"name": "查用户存款(昨天)", "sql": "SELECT * FROM core.cunkuan WHERE cust_no = :cust_no AND rq = $zt"},
+  {"name": "cells表查显示值(测试用)", "sql": "SELECT \"row\", col, display FROM cells WHERE display = :d"}
+]
