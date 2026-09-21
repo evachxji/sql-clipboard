@@ -100,3 +100,8 @@ main{flex:1;overflow:auto;padding:18px 28px}
   border-radius:50%;background:var(--line);color:var(--mute);font-size:10px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;line-height:1;padding:0;transition:.15s}
 .f-clear:hover{background:var(--acc);color:#fff}
+/* 编辑模式：单元格右上角删除按钮 */
+.note{position:relative}
+.cell-x{position:absolute;top:2px;right:4px;width:14px;height:14px;font-size:9px;color:var(--mute);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:50%;line-height:1;z-index:2}
+.cell-x:hover{background:#b3261e;color:#fff}

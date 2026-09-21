@@ -209,6 +209,13 @@ export default function App() {
                   onContextMenu={e => openMenu(e, cell)}
                 >
                   <div className="d">{cell.display}</div>
+                  {editing && (
+                    <span
+                      className="cell-x"
+                      title="删除"
+                      onClick={e => { e.stopPropagation(); deleteCell(cell) }}
+                    >✕</span>
+                  )}
                 </div>
               )
             })}
