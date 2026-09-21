@@ -53,9 +53,11 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .addrow{margin:2px 28px 16px;padding:11px;border:1.5px dashed var(--line);border-radius:10px;background:none;
   color:var(--mute);font-size:13px;font-weight:500;cursor:pointer;transition:.18s;font-family:inherit}
 .addrow:hover{border-color:var(--acc);color:var(--acc);background:var(--card)}
-.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(80px);background:var(--ink);color:var(--paper);
-  padding:10px 24px;border-radius:30px;font-size:13px;transition:.3s cubic-bezier(.2,.8,.2,1);opacity:0;pointer-events:none;z-index:50}
-.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toasts{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column;gap:8px;
+  align-items:flex-end;z-index:50;pointer-events:none}
+.toast-item{background:var(--ink);color:var(--paper);padding:9px 22px;border-radius:30px;
+  font-size:13px;box-shadow:0 6px 18px rgba(33,29,21,.2);animation:tin .2s cubic-bezier(.2,.8,.2,1)}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
 .ctx{position:fixed;z-index:40;background:var(--card);border:1px solid var(--line);border-radius:10px;
   box-shadow:0 10px 30px rgba(33,29,21,.18);padding:5px;min-width:110px;animation:pop .15s cubic-bezier(.2,.9,.3,1.2)}
 .ctx button{display:block;width:100%;text-align:left;padding:7px 14px;border:none;background:none;
@@ -80,12 +82,18 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .box textarea.invalid{border-color:#b3261e}
 .box .err{color:#b3261e;font-size:12px;margin-top:4px}
 .btn.save:disabled{opacity:.45;cursor:not-allowed;filter:none}
-/* 字体大小调节：横向滑块 */
-.fs-slider{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.fs-slider .fs-a{font-family:'Fraunces',serif;color:var(--mute);line-height:1}
-.fs-slider .fs-small{font-size:11px}
-.fs-slider .fs-large{font-size:17px}
-.fs-slider input[type=range]{width:110px;accent-color:var(--acc);cursor:pointer}
+/* 字体大小调节：图标按钮 + 悬停滑块面板 */
+.fs-wrap{position:relative;flex-shrink:0;padding-bottom:10px;margin-bottom:-10px}
+.fs-btn{width:38px;height:28px;border:1.5px solid var(--line);border-radius:8px;background:none;color:var(--ink);
+  font-family:'Fraunces',serif;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+.fs-btn:hover{border-color:var(--acc);color:var(--acc)}
+.fs-panel{display:none;position:absolute;right:0;top:100%;width:180px;background:var(--card);
+  border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(33,29,21,.18);
+  padding:12px 14px 8px;z-index:25}
+.fs-wrap:hover .fs-panel{display:block}
+.fs-panel input[type=range]{width:100%;accent-color:var(--acc);cursor:pointer;margin:0}
+.fs-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--mute);margin-top:3px}
+.fs-labels .on{color:var(--acc);font-weight:600}
 .box .hint{font-size:11.5px;color:var(--mute);margin-top:5px;line-height:1.5}
 .box .hint code{font-family:'IBM Plex Mono',monospace;color:var(--acc);background:var(--acc-soft);padding:0 4px;border-radius:4px}
 .f-clear{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:17px;height:17px;border:none;

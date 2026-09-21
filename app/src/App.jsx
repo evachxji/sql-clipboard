@@ -22,6 +22,8 @@ const MOCK = [
 
 const hasCopy = cell => cell.copy.trim() !== ''
 
+const ZOOMS = [0.85, 1, 1.2] // 小 / 中 / 大
+
 // 日期变量注入：复制时把 $jt 等替换为带单引号的 'yyyy-MM-dd'
 function dateVars() {
   const p = n => String(n).padStart(2, '0')
@@ -46,13 +48,15 @@ function injectVars(text) {
 export default function App() {
   const [cells, setCells] = useState([])
   const [editing, setEditing] = useState(false)
-  const [toast, setToast] = useState(false)
-  const [toastMsg, setToastMsg] = useState('已复制到剪贴板 ✓')
+  const [toasts, setToasts] = useState([])
   const [modal, setModal] = useState(null) // {id, display, copy}
   const [menu, setMenu] = useState(null)   // {x, y, cell}
   const [query, setQuery] = useState('')
-  const [zoom, setZoom] = useState(() => parseFloat(localStorage.getItem('cellZoom')) || 1)
-  useEffect(() => { localStorage.setItem('cellZoom', String(zoom)) }, [zoom])
+  const [level, setLevel] = useState(() => {
+    const v = parseInt(localStorage.getItem('fontLevel'))
+    return [0, 1, 2].includes(v) ? v : 1 // 默认中档
+  })
+  useEffect(() => { localStorage.setItem('fontLevel', String(level)) }, [level])
 
   const load = useCallback(async () => {
     if (isTauri) setCells(await invoke('load_cells'))
@@ -78,19 +82,20 @@ export default function App() {
     [rows, q],
   )
 
-  const showToast = (msg = '已复制到剪贴板 ✓') => {
-    setToastMsg(msg)
-    setToast(true)
-    setTimeout(() => setToast(false), 1400)
+  // 每次复制生成一条独立 toast，各自计时 1.5s 后消失
+  const showToast = () => {
+    const id = Date.now() + Math.random()
+    setToasts(ts => [...ts, id])
+    setTimeout(() => setToasts(ts => ts.filter(t => t !== id)), 1500)
   }
 
   const clickCell = async (cell) => {
     if (editing) { setModal({ ...cell }); return }
     const raw = hasCopy(cell) ? cell.copy : cell.display // 无复制值则复制显示值
-    const { text, hit } = injectVars(raw) // 复制时注入日期变量
+    const { text } = injectVars(raw) // 复制时注入日期变量
     if (isTauri) await invoke('copy_text', { text })
     else await navigator.clipboard.writeText(text)
-    showToast(hit ? '已复制（日期变量已替换） ✓' : '已复制到剪贴板 ✓')
+    showToast()
   }
 
   const openMenu = (e, cell) => {
@@ -148,19 +153,24 @@ export default function App() {
         <div className="switch" onClick={() => setEditing(e => !e)}>
           <span>编辑模式</span><div className="tg" />
         </div>
-        <div className="fs-slider" title={`字体大小 ${Math.round(zoom * 100)}%`}>
-          <span className="fs-a fs-small">A</span>
-          <input
-            type="range" min="0.7" max="1.5" step="0.05"
-            value={zoom}
-            onChange={e => setZoom(parseFloat(e.target.value))}
-            onClick={e => e.stopPropagation()}
-          />
-          <span className="fs-a fs-large">A</span>
+        <div className="fs-wrap">
+          <button className="fs-btn" title="字体大小">Aa</button>
+          <div className="fs-panel" onClick={e => e.stopPropagation()}>
+            <input
+              type="range" min="0" max="2" step="1"
+              value={level}
+              onChange={e => setLevel(parseInt(e.target.value))}
+            />
+            <div className="fs-labels">
+              {['小', '中', '大'].map((t, i) => (
+                <span key={t} className={level === i ? 'on' : ''}>{t}</span>
+              ))}
+            </div>
+          </div>
         </div>
       </header>
 
-      <main style={{ zoom }}>
+      <main style={{ zoom: ZOOMS[level] }}>
         {rows.length === 0 && (
           <div className="empty">还没有内容，开启右上角「编辑模式」后可添加行。</div>
         )}
@@ -197,7 +207,9 @@ export default function App() {
       </main>
 
       {editing && <button className="addrow" onClick={addRow}>＋ 添加行</button>}
-      <div className={toast ? 'toast show' : 'toast'}>{toastMsg}</div>
+      <div className="toasts">
+        {toasts.map(id => <div className="toast-item" key={id}>已复制</div>)}
+      </div>
 
       {menu && (
         <div
