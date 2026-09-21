@@ -35,6 +35,14 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 28px}
 .cell.hit .d{color:var(--acc)}
 .app.editing .cell{border:1.5px dashed var(--acc);background:var(--acc-soft)}
 .app.editing .cell::before{background:var(--acc)}
+/* 荧光笔文本格（复制值为空）：纯文本展示，不可点击 */
+.note{flex:0 1 auto;min-width:0;max-width:240px;padding:3px 7px;cursor:default}
+.note .d{font-size:13px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:linear-gradient(180deg,transparent 55%,rgba(179,84,30,.22) 55%,rgba(179,84,30,.22) 92%,transparent 92%)}
+.note.hit .d{color:var(--acc);
+  background:linear-gradient(180deg,transparent 55%,rgba(179,84,30,.38) 55%,rgba(179,84,30,.38) 92%,transparent 92%)}
+.app.editing .note{cursor:pointer}
+.app.editing .note .d{border-bottom:1.5px dashed var(--acc)}
 .addcol{flex-shrink:0;width:30px;height:30px;border:1.5px dashed var(--line);border-radius:8px;background:none;color:var(--mute);
   font-size:15px;cursor:pointer;transition:.18s;font-family:inherit}
 .addcol:hover{border-color:var(--blue);color:var(--blue)}
@@ -65,3 +73,6 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 28px}
   border:1.5px solid var(--line);background:none;color:var(--ink);transition:.15s;margin-left:8px}
 .btn.del{color:#b3261e;border-color:#ecc8c5;margin-left:0}.btn.del:hover{background:#b3261e;color:#fff}
 .btn.save{border-color:var(--acc);background:var(--acc);color:#fff}.btn.save:hover{filter:brightness(1.1)}
+.box textarea.invalid{border-color:#b3261e}
+.box .err{color:#b3261e;font-size:12px;margin-top:4px}
+.btn.save:disabled{opacity:.45;cursor:not-allowed;filter:none}

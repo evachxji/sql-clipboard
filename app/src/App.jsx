@@ -6,13 +6,16 @@ const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
 // 浏览器预览时使用的示例数据（打包后在 Tauri 中走 SQLite）
 const MOCK = [
   { id: 1, row: 0, col: 0, display: '活跃用户查询', copy: "SELECT * FROM users WHERE status='active';" },
-  { id: 2, row: 0, col: 1, display: '月度订单统计', copy: 'SELECT ... GROUP BY m;' },
-  { id: 3, row: 0, col: 2, display: '库存预警', copy: 'SELECT sku,name,qty FROM inventory;' },
-  { id: 4, row: 0, col: 3, display: '新客转化率', copy: 'SELECT COUNT(*) ...;' },
+  { id: 2, row: 0, col: 1, display: '按近30天登录口径', copy: '' },
+  { id: 3, row: 0, col: 2, display: '月度订单统计', copy: 'SELECT ... GROUP BY m;' },
+  { id: 4, row: 0, col: 3, display: '库存预警', copy: 'SELECT sku,name,qty FROM inventory;' },
   { id: 5, row: 1, col: 0, display: '权限审计', copy: 'SELECT u.name,r.role ...;' },
   { id: 6, row: 1, col: 1, display: '数据去重', copy: 'DELETE FROM logs ...;' },
-  { id: 7, row: 2, col: 0, display: '慢查询TOP10', copy: 'SELECT ... LIMIT 10;' },
+  { id: 7, row: 1, col: 2, display: '先备份再执行', copy: '' },
+  { id: 8, row: 2, col: 0, display: '慢查询TOP10', copy: 'SELECT ... LIMIT 10;' },
 ]
+
+const hasCopy = cell => cell.copy.trim() !== ''
 
 export default function App() {
   const [cells, setCells] = useState([])
@@ -53,9 +56,9 @@ export default function App() {
 
   const clickCell = async (cell) => {
     if (editing) { setModal({ ...cell }); return }
-    const text = cell.copy || cell.display
-    if (isTauri) await invoke('copy_text', { text })
-    else await navigator.clipboard.writeText(text)
+    if (!hasCopy(cell)) return // 复制值为空：纯文本格，无点击复制
+    if (isTauri) await invoke('copy_text', { text: cell.copy })
+    else await navigator.clipboard.writeText(cell.copy)
     showToast()
   }
 
@@ -83,8 +86,9 @@ export default function App() {
   }
 
   const saveModal = async (display, copy) => {
-    if (isTauri) { await invoke('update_cell', { id: modal.id, display: display || '显示值', copy }); await load() }
-    else setCells(cs => cs.map(c => c.id === modal.id ? { ...c, display: display || '显示值', copy } : c))
+    if (!display) return // 显示值必填（EditBox 已拦截，双保险）
+    if (isTauri) { await invoke('update_cell', { id: modal.id, display, copy }); await load() }
+    else setCells(cs => cs.map(c => c.id === modal.id ? { ...c, display, copy } : c))
     setModal(null)
   }
 
@@ -119,17 +123,23 @@ export default function App() {
         )}
         {visibleRows.map(([r, list]) => (
           <div className="row" key={r}>
-            {list.map(cell => (
-              <div
-                className={q && cell.display.toLowerCase().includes(q) ? 'cell hit' : 'cell'}
-                key={cell.id}
-                title={cell.display}
-                onClick={() => clickCell(cell)}
-                onContextMenu={e => openMenu(e, cell)}
-              >
-                <div className="d">{cell.display}</div>
-              </div>
-            ))}
+            {list.map(cell => {
+              const cls = [
+                hasCopy(cell) ? 'cell' : 'note',
+                q && cell.display.toLowerCase().includes(q) ? 'hit' : '',
+              ].join(' ').trim()
+              return (
+                <div
+                  className={cls}
+                  key={cell.id}
+                  title={cell.display}
+                  onClick={() => clickCell(cell)}
+                  onContextMenu={e => openMenu(e, cell)}
+                >
+                  <div className="d">{cell.display}</div>
+                </div>
+              )
+            })}
             {editing && (
               <button className="addcol" title="追加列" onClick={() => addCol(r, list)}>＋</button>
             )}
@@ -164,18 +174,25 @@ export default function App() {
 function EditBox({ cell, onSave, onDelete, onClose }) {
   const [display, setDisplay] = useState(cell.display)
   const [copy, setCopy] = useState(cell.copy)
+  const empty = display.trim() === ''
   return (
     <div className="box">
       <h3>编辑单元格</h3>
-      <label>显示值</label>
-      <textarea className="disp" rows={2} value={display} onChange={e => setDisplay(e.target.value)} />
-      <label>复制值 (SQL)</label>
+      <label>显示值（必填）</label>
+      <textarea
+        className={empty ? 'disp invalid' : 'disp'}
+        rows={2}
+        value={display}
+        onChange={e => setDisplay(e.target.value)}
+      />
+      {empty && <div className="err">显示值不能为空</div>}
+      <label>复制值 (SQL，可留空；留空则该格仅作文本展示)</label>
       <textarea rows={7} value={copy} onChange={e => setCopy(e.target.value)} spellCheck={false} />
       <div className="actions">
         <button className="btn del" onClick={onDelete}>删除该单元格</button>
         <span>
           <button className="btn" onClick={onClose}>取消</button>
-          <button className="btn save" onClick={() => onSave(display.trim(), copy)}>保存</button>
+          <button className="btn save" disabled={empty} onClick={() => onSave(display.trim(), copy)}>保存</button>
         </span>
       </div>
     </div>
