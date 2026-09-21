@@ -134,12 +134,17 @@ export default function App() {
       <header>
         <h1>SQL <em>剪切板</em></h1>
         <div className="sub">Query Ledger · 账簿</div>
-        <input
-          className="filter"
-          placeholder="筛选显示值…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
+        <div className="f-wrap">
+          <input
+            className="filter"
+            placeholder="筛选显示值…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+          {query && (
+            <button className="f-clear" title="清空" onClick={() => setQuery('')}>✕</button>
+          )}
+        </div>
         <div className="switch" onClick={() => setEditing(e => !e)}>
           <span>编辑模式</span><div className="tg" />
         </div>

@@ -11,7 +11,8 @@ header{display:flex;align-items:center;gap:16px;padding:14px 28px 12px;border-bo
 h1{font-family:'Fraunces','Microsoft YaHei',serif;font-size:22px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
 h1 em{font-style:italic;color:var(--acc)}
 .sub{font-size:12px;color:var(--mute);letter-spacing:2px;text-transform:uppercase;white-space:nowrap}
-.filter{margin-left:auto;width:180px;padding:7px 14px;border:1.5px solid var(--line);border-radius:30px;
+.f-wrap{position:relative;margin-left:auto;flex-shrink:0}
+.filter{width:180px;padding:7px 28px 7px 14px;border:1.5px solid var(--line);border-radius:30px;
   background:var(--paper);color:var(--ink);font-size:12.5px;font-family:inherit;outline:none;transition:.15s}
 .filter:focus{border-color:var(--acc);width:220px}
 .filter::placeholder{color:var(--mute)}
@@ -87,3 +88,7 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .fs-slider input[type=range]{width:110px;accent-color:var(--acc);cursor:pointer}
 .box .hint{font-size:11.5px;color:var(--mute);margin-top:5px;line-height:1.5}
 .box .hint code{font-family:'IBM Plex Mono',monospace;color:var(--acc);background:var(--acc-soft);padding:0 4px;border-radius:4px}
+.f-clear{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:17px;height:17px;border:none;
+  border-radius:50%;background:var(--line);color:var(--mute);font-size:10px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;line-height:1;padding:0;transition:.15s}
+.f-clear:hover{background:var(--acc);color:#fff}
