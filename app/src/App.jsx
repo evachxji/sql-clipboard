@@ -175,6 +175,7 @@ export default function App() {
         {rows.length > 0 && visibleRows.length === 0 && (
           <div className="empty">没有命中「{query.trim()}」的行。</div>
         )}
+        <div className="grid">
         {visibleRows.map(([r, list]) => (
           <div className="row" key={r}>
             {list.map((cell, idx) => {
@@ -200,6 +201,7 @@ export default function App() {
             )}
           </div>
         ))}
+        </div>
       </main>
 
       {editing && <button className="addrow" onClick={addRow}>＋ 添加行</button>}

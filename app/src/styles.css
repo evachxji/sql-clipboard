@@ -20,15 +20,18 @@ h1 em{font-style:italic;color:var(--acc)}
 .switch .tg::after{content:"";position:absolute;top:2.5px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--ink);transition:.25s}
 .app.editing .switch .tg{background:var(--ink)}
 .app.editing .switch .tg::after{left:23px;background:var(--card)}
-main{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 28px}
+main{flex:1;overflow:auto;padding:18px 28px}
 .empty{color:var(--mute);font-size:13.5px;padding:40px 0;text-align:center}
-.row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:nowrap;overflow:hidden}
-.cell{flex:0 1 auto;min-width:0;max-width:200px;background:var(--card);border:1px solid var(--line);
-  border-radius:8px;padding:7px 12px 7px 14px;cursor:pointer;position:relative;transition:.18s;
+/* Excel 式列对齐：table 布局让同列单元格跨行对齐 */
+.grid{display:table;border-collapse:separate;border-spacing:8px 10px;margin:-10px 0 0 -8px}
+.row{display:table-row}
+.cell{display:table-cell;vertical-align:middle;background:var(--card);border:1px solid var(--line);
+  border-radius:8px;padding:7px 12px 7px 14px;cursor:pointer;position:relative;transition:border-color .18s,box-shadow .18s;
   box-shadow:0 1px 2px rgba(33,29,21,.05)}
+.cell .d{max-width:230px}
 .cell::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--line);transition:.18s}
 .cell .d{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cell:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(33,29,21,.1);border-color:var(--acc)}
+.cell:hover{box-shadow:0 4px 12px rgba(33,29,21,.1);border-color:var(--acc)}
 .cell:hover::before{background:var(--acc)}
 .cell.hit{border-color:var(--acc)}
 .cell.hit::before{background:var(--acc)}
@@ -36,14 +39,14 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 28px}
 .app.editing .cell{border:1.5px dashed var(--acc);background:var(--acc-soft)}
 .app.editing .cell::before{background:var(--acc)}
 /* 词条文本格（复制值为空）：§ 节号 + 虚线下划，点击复制显示值 */
-.note{flex:0 1 auto;min-width:0;max-width:240px;padding:3px 2px;cursor:pointer}
-.note .d{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+.note{display:table-cell;vertical-align:middle;max-width:240px;padding:3px 2px;cursor:pointer}
+.note .d{max-width:230px;font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   border-bottom:1.5px dotted rgba(138,129,114,.55);padding-bottom:2px;transition:.15s}
 .note.lead .d::before{content:"§";color:var(--acc);margin-right:7px;font-size:12px}
 .note:hover .d{color:var(--ink);border-bottom-color:var(--acc)}
 .note.hit .d{color:var(--acc);border-bottom-color:var(--acc)}
 .app.editing .note .d{border-bottom:1.5px dashed var(--acc)}
-.addcol{flex-shrink:0;width:30px;height:30px;border:1.5px dashed var(--line);border-radius:8px;background:none;color:var(--mute);
+.addcol{display:table-cell;vertical-align:middle;width:30px;height:30px;border:1.5px dashed var(--line);border-radius:8px;background:none;color:var(--mute);
   font-size:15px;cursor:pointer;transition:.18s;font-family:inherit}
 .addcol:hover{border-color:var(--blue);color:var(--blue)}
 .addrow{margin:2px 28px 16px;padding:11px;border:1.5px dashed var(--line);border-radius:10px;background:none;
