@@ -91,6 +91,23 @@ fn update_cell(id: i64, display: String, copy: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 在 (row, col) 处插入单元格，该行 col 大于插入点的列依次右移一格
+#[tauri::command]
+fn insert_cell(row: i64, col: i64, display: String, copy: String) -> Result<(), String> {
+    let conn = open()?;
+    conn.execute(
+        "UPDATE cells SET col = col + 1 WHERE \"row\" = ?1 AND col > ?2",
+        [row, col],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO cells (\"row\", col, display, copy) VALUES (?1, ?2 + 1, ?3, ?4)",
+        (row, col, display, copy),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 fn delete_cell(id: i64) -> Result<(), String> {
     open()?
@@ -108,7 +125,7 @@ fn copy_text(text: String) -> Result<(), String> {
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            load_cells, add_cell, update_cell, delete_cell, copy_text
+            load_cells, add_cell, insert_cell, update_cell, delete_cell, copy_text
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");
