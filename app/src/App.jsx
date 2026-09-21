@@ -13,15 +13,46 @@ const MOCK = [
   { id: 6, row: 1, col: 1, display: '数据去重', copy: 'DELETE FROM logs ...;' },
   { id: 7, row: 1, col: 2, display: '先备份再执行', copy: '' },
   { id: 9, row: 2, col: 0, display: '每周一早上跑', copy: '' },
+  { id: 10, row: 3, col: 0, display: '【每日】存款', copy: '' },
+  { id: 11, row: 3, col: 1, display: 'core.cunkuan', copy: 'core.cunkuan' },
+  { id: 12, row: 3, col: 2, display: '查上月', copy: 'SELECT * FROM core.cunkuan WHERE rq BETWEEN $sy AND $syz;' },
   { id: 8, row: 2, col: 1, display: '慢查询TOP10', copy: 'SELECT ... LIMIT 10;' },
 ]
 
 const hasCopy = cell => cell.copy.trim() !== ''
 
+// 日期变量注入：复制时把 $jt 等替换为带单引号的 'yyyy-MM-dd'
+function dateVars() {
+  const p = n => String(n).padStart(2, '0')
+  const f = d => `'${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}'`
+  const now = new Date()
+  const t = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  // 注意：较长的键必须排在前面，避免 $sy 抢先匹配 $syz
+  return [
+    ['$syz', f(new Date(t.getFullYear(), t.getMonth(), 0))],            // 上月最后一天
+    ['$qnt', f(new Date(t.getFullYear() - 1, t.getMonth(), t.getDate()))], // 去年今天
+    ['$qnd', f(new Date(t.getFullYear() - 1, 11, 31))],                 // 去年底
+    ['$jt', f(t)],                                                      // 今天
+    ['$zt', f(new Date(t.getTime() - 86400000))],                       // 昨天
+    ['$by', f(new Date(t.getFullYear(), t.getMonth(), 1))],             // 本月第一天
+    ['$sy', f(new Date(t.getFullYear(), t.getMonth() - 1, 1))],         // 上月第一天
+  ]
+}
+
+function injectVars(text) {
+  if (!text.includes('$')) return { text, hit: false }
+  let out = text, hit = false
+  for (const [k, v] of dateVars()) {
+    if (out.includes(k)) { out = out.split(k).join(v); hit = true }
+  }
+  return { text: out, hit }
+}
+
 export default function App() {
   const [cells, setCells] = useState([])
   const [editing, setEditing] = useState(false)
   const [toast, setToast] = useState(false)
+  const [toastMsg, setToastMsg] = useState('已复制到剪贴板 ✓')
   const [modal, setModal] = useState(null) // {id, display, copy}
   const [menu, setMenu] = useState(null)   // {x, y, cell}
   const [query, setQuery] = useState('')
@@ -53,17 +84,19 @@ export default function App() {
     [rows, q],
   )
 
-  const showToast = () => {
+  const showToast = (msg = '已复制到剪贴板 ✓') => {
+    setToastMsg(msg)
     setToast(true)
     setTimeout(() => setToast(false), 1400)
   }
 
   const clickCell = async (cell) => {
     if (editing) { setModal({ ...cell }); return }
-    const text = hasCopy(cell) ? cell.copy : cell.display // 无复制值则复制显示值
+    const raw = hasCopy(cell) ? cell.copy : cell.display // 无复制值则复制显示值
+    const { text, hit } = injectVars(raw) // 复制时注入日期变量
     if (isTauri) await invoke('copy_text', { text })
     else await navigator.clipboard.writeText(text)
-    showToast()
+    showToast(hit ? '已复制（日期变量已替换） ✓' : '已复制到剪贴板 ✓')
   }
 
   const openMenu = (e, cell) => {
@@ -170,7 +203,7 @@ export default function App() {
       </main>
 
       {editing && <button className="addrow" onClick={addRow}>＋ 添加行</button>}
-      <div className={toast ? 'toast show' : 'toast'}>已复制到剪贴板 ✓</div>
+      <div className={toast ? 'toast show' : 'toast'}>{toastMsg}</div>
 
       {menu && (
         <div

@@ -46,6 +46,21 @@ cd app
 npm run tauri dev
 ```
 
+## 🔤 日期变量注入
+
+SQL 复制值中可使用以下变量，**点击复制时自动替换为带单引号的日期**（`' + "'yyyy-MM-dd'" + @'` 格式）：
+
+| 变量 | 含义 | 变量 | 含义 |
+| --- | --- | --- | --- |
+| `$jt` | 今天 | `$by` | 本月第一天 |
+| `$zt` | 昨天 | `$sy` | 上月第一天 |
+| `$qnt` | 去年今天 | `$syz` | 上月最后一天 |
+| `$qnd` | 去年底（12-31） | | |
+
+示例：`SELECT * FROM core.cunkuan WHERE rq = $jt;` 复制后得到 `SELECT * FROM core.cunkuan WHERE rq = '2026-09-21';`
+
+`tools/seed_example_data.py` 可向数据库写入 40 行银行业务示例数据（表定义 / 表名 / 常用时间维度查询）。
+
 ## 🛠 技术栈
 
 | 层 | 技术 |
