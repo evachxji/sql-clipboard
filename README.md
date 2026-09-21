@@ -20,7 +20,7 @@
 
 ### 方式一：直接使用
 
-下载 Release 中的 `SQL剪切板.exe`，双击运行。首次启动会自动在 exe 同目录创建数据库，并生成一条示例数据。
+从 [Releases](https://github.com/evachxji/sql-clipboard/releases) 下载最新版本的 exe，双击运行。首次启动会自动在 exe 同目录创建数据库，并生成一条示例数据。
 
 > 依赖系统自带 WebView2 运行时（Windows 10/11 均内置）。
 
