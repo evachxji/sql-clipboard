@@ -24,6 +24,9 @@ export default function App() {
   const [modal, setModal] = useState(null) // {id, display, copy}
   const [menu, setMenu] = useState(null)   // {x, y, cell}
   const [query, setQuery] = useState('')
+  const [size, setSize] = useState(() => localStorage.getItem('cellSize') || 'm')
+  const [sizeMenu, setSizeMenu] = useState(false)
+  useEffect(() => { localStorage.setItem('cellSize', size) }, [size])
 
   const load = useCallback(async () => {
     if (isTauri) setCells(await invoke('load_cells'))
@@ -99,7 +102,7 @@ export default function App() {
   }
 
   return (
-    <div className={editing ? 'app editing' : 'app'} onClick={() => setMenu(null)}>
+    <div className={editing ? 'app editing' : 'app'} onClick={() => { setMenu(null); setSizeMenu(false) }}>
       <header>
         <h1>SQL <em>剪切板</em></h1>
         <div className="sub">Query Ledger · 账簿</div>
@@ -112,9 +115,26 @@ export default function App() {
         <div className="switch" onClick={() => setEditing(e => !e)}>
           <span>编辑模式</span><div className="tg" />
         </div>
+        <div className="fs-wrap">
+          <button
+            className="fs-btn"
+            title="字体大小"
+            onClick={e => { e.stopPropagation(); setSizeMenu(o => !o) }}
+          >Aa</button>
+          {sizeMenu && (
+            <div className="ctx fs-menu" onClick={e => e.stopPropagation()}>
+              {[['s', '小', 12], ['m', '中', 14], ['l', '大', 17]].map(([k, label, px]) => (
+                <button key={k} className={size === k ? 'on' : ''} onClick={() => { setSize(k); setSizeMenu(false) }}>
+                  <span>{label}</span>
+                  <span className="fs-a" style={{ fontSize: px }}>A</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </header>
 
-      <main>
+      <main style={{ zoom: { s: 0.85, m: 1, l: 1.2 }[size] }}>
         {rows.length === 0 && (
           <div className="empty">还没有内容，开启右上角「编辑模式」后可添加行。</div>
         )}
