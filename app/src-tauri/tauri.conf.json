@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SQL剪切板",
+  "version": "0.1.0",
+  "identifier": "com.sqlclipboard.app",
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "SQL 剪切板",
+        "width": 1024,
+        "height": 680,
+        "minWidth": 760,
+        "minHeight": 480
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["icons/256x256.png", "icons/icon.ico"]
+  }
+}
