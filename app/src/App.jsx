@@ -1,6 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import QueryPage from './QueryPage.jsx'
 
 const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
 
@@ -50,7 +49,6 @@ export default function App() {
   const [cells, setCells] = useState([])
   const [editing, setEditing] = useState(false)
   const [toasts, setToasts] = useState([])
-  const [tab, setTab] = useState('clip')
   const [modal, setModal] = useState(null) // {id, display, copy}
   const [menu, setMenu] = useState(null)   // {x, y, cell}
   const [query, setQuery] = useState('')
@@ -155,11 +153,6 @@ export default function App() {
       <header>
         <h1>SQL <em>剪切板</em></h1>
         <div className="sub">Query Ledger · 账簿</div>
-        <div className="tabs">
-          <button className={tab === 'clip' ? 'tab on' : 'tab'} onClick={() => setTab('clip')}>剪切板</button>
-          <button className={tab === 'query' ? 'tab on' : 'tab'} onClick={() => setTab('query')}>查询执行</button>
-        </div>
-        {tab === 'clip' && (<>
         <div className="f-wrap">
           <input
             className="filter"
@@ -189,10 +182,8 @@ export default function App() {
             </div>
           </div>
         </div>
-        </>)}
       </header>
 
-      {tab === 'clip' && (<>
       <main style={{ zoom: ZOOMS[level] }}>
         {rows.length === 0 && (
           <div className="empty">还没有内容，开启右上角「编辑模式」后可添加行。</div>
@@ -254,8 +245,6 @@ export default function App() {
           <EditBox cell={modal} onSave={saveModal} onDelete={deleteModal} onClose={() => setModal(null)} />
         </div>
       )}
-      </>)}
-      {tab === 'query' && <QueryPage />}
     </div>
   )
 }
