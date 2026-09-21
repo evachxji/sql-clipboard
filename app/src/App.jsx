@@ -15,7 +15,8 @@ const MOCK = [
   { id: 9, row: 2, col: 0, display: '每周一早上跑', copy: '' },
   { id: 10, row: 3, col: 0, display: '【每日】存款', copy: '' },
   { id: 11, row: 3, col: 1, display: 'core.cunkuan', copy: 'core.cunkuan' },
-  { id: 12, row: 3, col: 2, display: '查上月', copy: 'SELECT * FROM core.cunkuan WHERE rq BETWEEN $sy AND $syz;' },
+  { id: 12, row: 3, col: 2, display: '查昨天', copy: 'SELECT * FROM core.cunkuan WHERE rq = $zt;' },
+  { id: 13, row: 3, col: 3, display: '查上月底', copy: 'SELECT * FROM core.cunkuan WHERE rq = $syd;' },
   { id: 8, row: 2, col: 1, display: '慢查询TOP10', copy: 'SELECT ... LIMIT 10;' },
 ]
 
@@ -27,15 +28,9 @@ function dateVars() {
   const f = d => `'${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}'`
   const now = new Date()
   const t = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  // 注意：较长的键必须排在前面，避免 $sy 抢先匹配 $syz
   return [
-    ['$syz', f(new Date(t.getFullYear(), t.getMonth(), 0))],            // 上月最后一天
-    ['$qnt', f(new Date(t.getFullYear() - 1, t.getMonth(), t.getDate()))], // 去年今天
-    ['$qnd', f(new Date(t.getFullYear() - 1, 11, 31))],                 // 去年底
-    ['$jt', f(t)],                                                      // 今天
-    ['$zt', f(new Date(t.getTime() - 86400000))],                       // 昨天
-    ['$by', f(new Date(t.getFullYear(), t.getMonth(), 1))],             // 本月第一天
-    ['$sy', f(new Date(t.getFullYear(), t.getMonth() - 1, 1))],         // 上月第一天
+    ['$zt', f(new Date(t.getTime() - 86400000))],            // 昨天
+    ['$syd', f(new Date(t.getFullYear(), t.getMonth(), 0))], // 上月底（上月最后一天）
   ]
 }
 
@@ -245,6 +240,7 @@ function EditBox({ cell, onSave, onDelete, onClose }) {
       {empty && <div className="err">显示值不能为空</div>}
       <label>复制值 (SQL，可留空；留空则点击复制显示值)</label>
       <textarea rows={7} value={copy} onChange={e => setCopy(e.target.value)} spellCheck={false} />
+      <div className="hint">支持变量：<code>$zt</code> = 昨天、<code>$syd</code> = 上月底，复制时自动替换为带引号的 'yyyy-MM-dd'</div>
       <div className="actions">
         <button className="btn del" onClick={onDelete}>删除该单元格</button>
         <span>

@@ -48,11 +48,11 @@ TABLES = [
 ]
 
 QUERIES = [
-    ("查今天",   "SELECT * FROM {t} WHERE rq = $jt;"),
     ("查昨天",   "SELECT * FROM {t} WHERE rq = $zt;"),
-    ("查上月",   "SELECT * FROM {t} WHERE rq BETWEEN $sy AND $syz;"),
-    ("查去年底", "SELECT * FROM {t} WHERE rq = $qnd;"),
-    ("去年今天", "SELECT * FROM {t} WHERE rq = $qnt;"),
+    ("查上月底", "SELECT * FROM {t} WHERE rq = $syd;"),
+    ("昨天条数", "SELECT COUNT(*) FROM {t} WHERE rq = $zt;"),
+    ("上月底条数", "SELECT COUNT(*) FROM {t} WHERE rq = $syd;"),
+    ("查全部",   "SELECT * FROM {t};"),
 ]
 
 conn = sqlite3.connect(DB)
