@@ -79,15 +79,11 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .box textarea.invalid{border-color:#b3261e}
 .box .err{color:#b3261e;font-size:12px;margin-top:4px}
 .btn.save:disabled{opacity:.45;cursor:not-allowed;filter:none}
-/* 字体大小调节 */
-.fs-wrap{position:relative;flex-shrink:0}
-.fs-btn{width:38px;height:28px;border:1.5px solid var(--line);border-radius:8px;background:none;color:var(--ink);
-  font-family:'Fraunces',serif;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
-.fs-btn:hover{border-color:var(--acc);color:var(--acc)}
-.fs-menu{position:absolute;right:0;top:calc(100% + 6px);min-width:96px}
-.fs-menu button{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.fs-menu button .fs-a{font-family:'Fraunces',serif;color:var(--mute)}
-.fs-menu button.on{color:var(--acc);font-weight:600}
-.fs-menu button.on .fs-a{color:var(--acc)}
+/* 字体大小调节：横向滑块 */
+.fs-slider{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.fs-slider .fs-a{font-family:'Fraunces',serif;color:var(--mute);line-height:1}
+.fs-slider .fs-small{font-size:11px}
+.fs-slider .fs-large{font-size:17px}
+.fs-slider input[type=range]{width:110px;accent-color:var(--acc);cursor:pointer}
 .box .hint{font-size:11.5px;color:var(--mute);margin-top:5px;line-height:1.5}
 .box .hint code{font-family:'IBM Plex Mono',monospace;color:var(--acc);background:var(--acc-soft);padding:0 4px;border-radius:4px}
