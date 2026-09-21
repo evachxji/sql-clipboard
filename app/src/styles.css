@@ -35,13 +35,13 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 28px}
 .cell.hit .d{color:var(--acc)}
 .app.editing .cell{border:1.5px dashed var(--acc);background:var(--acc-soft)}
 .app.editing .cell::before{background:var(--acc)}
-/* 荧光笔文本格（复制值为空）：纯文本展示，不可点击 */
-.note{flex:0 1 auto;min-width:0;max-width:240px;padding:3px 7px;cursor:default}
-.note .d{font-size:13px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  background:linear-gradient(180deg,transparent 55%,rgba(179,84,30,.22) 55%,rgba(179,84,30,.22) 92%,transparent 92%)}
-.note.hit .d{color:var(--acc);
-  background:linear-gradient(180deg,transparent 55%,rgba(179,84,30,.38) 55%,rgba(179,84,30,.38) 92%,transparent 92%)}
-.app.editing .note{cursor:pointer}
+/* 词条文本格（复制值为空）：§ 节号 + 虚线下划，点击复制显示值 */
+.note{flex:0 1 auto;min-width:0;max-width:240px;padding:3px 2px;cursor:pointer}
+.note .d{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  border-bottom:1.5px dotted rgba(138,129,114,.55);padding-bottom:2px;transition:.15s}
+.note .d::before{content:"§";color:var(--acc);margin-right:7px;font-size:12px}
+.note:hover .d{color:var(--ink);border-bottom-color:var(--acc)}
+.note.hit .d{color:var(--acc);border-bottom-color:var(--acc)}
 .app.editing .note .d{border-bottom:1.5px dashed var(--acc)}
 .addcol{flex-shrink:0;width:30px;height:30px;border:1.5px dashed var(--line);border-radius:8px;background:none;color:var(--mute);
   font-size:15px;cursor:pointer;transition:.18s;font-family:inherit}

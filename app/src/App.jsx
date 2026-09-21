@@ -56,9 +56,9 @@ export default function App() {
 
   const clickCell = async (cell) => {
     if (editing) { setModal({ ...cell }); return }
-    if (!hasCopy(cell)) return // 复制值为空：纯文本格，无点击复制
-    if (isTauri) await invoke('copy_text', { text: cell.copy })
-    else await navigator.clipboard.writeText(cell.copy)
+    const text = hasCopy(cell) ? cell.copy : cell.display // 无复制值则复制显示值
+    if (isTauri) await invoke('copy_text', { text })
+    else await navigator.clipboard.writeText(text)
     showToast()
   }
 
@@ -186,7 +186,7 @@ function EditBox({ cell, onSave, onDelete, onClose }) {
         onChange={e => setDisplay(e.target.value)}
       />
       {empty && <div className="err">显示值不能为空</div>}
-      <label>复制值 (SQL，可留空；留空则该格仅作文本展示)</label>
+      <label>复制值 (SQL，可留空；留空则点击复制显示值)</label>
       <textarea rows={7} value={copy} onChange={e => setCopy(e.target.value)} spellCheck={false} />
       <div className="actions">
         <button className="btn del" onClick={onDelete}>删除该单元格</button>
