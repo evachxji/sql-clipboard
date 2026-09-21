@@ -12,7 +12,8 @@ const MOCK = [
   { id: 5, row: 1, col: 0, display: '权限审计', copy: 'SELECT u.name,r.role ...;' },
   { id: 6, row: 1, col: 1, display: '数据去重', copy: 'DELETE FROM logs ...;' },
   { id: 7, row: 1, col: 2, display: '先备份再执行', copy: '' },
-  { id: 8, row: 2, col: 0, display: '慢查询TOP10', copy: 'SELECT ... LIMIT 10;' },
+  { id: 9, row: 2, col: 0, display: '每周一早上跑', copy: '' },
+  { id: 8, row: 2, col: 1, display: '慢查询TOP10', copy: 'SELECT ... LIMIT 10;' },
 ]
 
 const hasCopy = cell => cell.copy.trim() !== ''
@@ -143,9 +144,10 @@ export default function App() {
         )}
         {visibleRows.map(([r, list]) => (
           <div className="row" key={r}>
-            {list.map(cell => {
+            {list.map((cell, idx) => {
               const cls = [
                 hasCopy(cell) ? 'cell' : 'note',
+                idx === 0 ? 'lead' : '', // 仅第一列文本格显示 § 节号
                 q && cell.display.toLowerCase().includes(q) ? 'hit' : '',
               ].join(' ').trim()
               return (

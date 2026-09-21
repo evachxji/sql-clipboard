@@ -39,7 +39,7 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 28px}
 .note{flex:0 1 auto;min-width:0;max-width:240px;padding:3px 2px;cursor:pointer}
 .note .d{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   border-bottom:1.5px dotted rgba(138,129,114,.55);padding-bottom:2px;transition:.15s}
-.note .d::before{content:"§";color:var(--acc);margin-right:7px;font-size:12px}
+.note.lead .d::before{content:"§";color:var(--acc);margin-right:7px;font-size:12px}
 .note:hover .d{color:var(--ink);border-bottom-color:var(--acc)}
 .note.hit .d{color:var(--acc);border-bottom-color:var(--acc)}
 .app.editing .note .d{border-bottom:1.5px dashed var(--acc)}
