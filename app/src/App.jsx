@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import QueryPage from './QueryPage.jsx'
 
 const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
 
@@ -49,6 +50,7 @@ export default function App() {
   const [cells, setCells] = useState([])
   const [editing, setEditing] = useState(false)
   const [toasts, setToasts] = useState([])
+  const [tab, setTab] = useState('clip')
   const [modal, setModal] = useState(null) // {id, display, copy}
   const [menu, setMenu] = useState(null)   // {x, y, cell}
   const [query, setQuery] = useState('')
@@ -115,6 +117,20 @@ export default function App() {
     else setCells(cs => [...cs, { id: Date.now(), row, col, display: '显示值', copy: '' }])
   }
 
+  // 在 cell 右侧插入新单元格（同行右侧列依次右移一格）
+  const insertRight = async (cell, display, copy) => {
+    setMenu(null)
+    if (isTauri) { await invoke('insert_cell', { row: cell.row, col: cell.col, display, copy }); await load() }
+    else setCells(cs => [
+      ...cs.map(c => (c.row === cell.row && c.col > cell.col ? { ...c, col: c.col + 1 } : c)),
+      { id: Date.now(), row: cell.row, col: cell.col + 1, display, copy },
+    ])
+  }
+
+  // 生成select：以显示值为表名生成查询 SQL，右侧新增「查询」单元格
+  const genSelect = (cell, yesterday) =>
+    insertRight(cell, '查询', `select * from ${cell.display}${yesterday ? ' where data_date = $zt' : ''};`)
+
   const addRow = async () => {
     const row = cells.length ? Math.max(...cells.map(c => c.row)) + 1 : 0
     if (isTauri) { await invoke('add_cell', { row, col: 0 }); await load() }
@@ -139,6 +155,11 @@ export default function App() {
       <header>
         <h1>SQL <em>剪切板</em></h1>
         <div className="sub">Query Ledger · 账簿</div>
+        <div className="tabs">
+          <button className={tab === 'clip' ? 'tab on' : 'tab'} onClick={() => setTab('clip')}>剪切板</button>
+          <button className={tab === 'query' ? 'tab on' : 'tab'} onClick={() => setTab('query')}>查询执行</button>
+        </div>
+        {tab === 'clip' && (<>
         <div className="f-wrap">
           <input
             className="filter"
@@ -168,8 +189,10 @@ export default function App() {
             </div>
           </div>
         </div>
+        </>)}
       </header>
 
+      {tab === 'clip' && (<>
       <main style={{ zoom: ZOOMS[level] }}>
         {rows.length === 0 && (
           <div className="empty">还没有内容，开启右上角「编辑模式」后可添加行。</div>
@@ -219,6 +242,9 @@ export default function App() {
           onContextMenu={e => e.preventDefault()}
         >
           <button onClick={() => { setModal({ ...menu.cell }); setMenu(null) }}>编辑</button>
+          <button onClick={() => genSelect(menu.cell, false)}>生成select</button>
+          <button onClick={() => genSelect(menu.cell, true)}>生成select（昨天）</button>
+          <button onClick={() => insertRight(menu.cell, menu.cell.display, menu.cell.copy)}>复制</button>
           <button className="danger" onClick={() => deleteCell(menu.cell)}>删除</button>
         </div>
       )}
@@ -228,6 +254,8 @@ export default function App() {
           <EditBox cell={modal} onSave={saveModal} onDelete={deleteModal} onClose={() => setModal(null)} />
         </div>
       )}
+      </>)}
+      {tab === 'query' && <QueryPage />}
     </div>
   )
 }
