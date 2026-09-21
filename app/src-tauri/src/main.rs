@@ -181,6 +181,7 @@ fn update_cell(id: i64, display: String, copy: String) -> Result<(), String> {
     Ok(())
 }
 
+
 #[tauri::command]
 fn delete_cell(id: i64) -> Result<(), String> {
     open()?.execute("DELETE FROM cells WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
