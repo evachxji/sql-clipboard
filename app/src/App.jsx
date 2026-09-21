@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import QueryPage from './QueryPage.jsx'
 
@@ -237,7 +237,11 @@ export default function App() {
       {menu && (
         <div
           className="ctx"
-          style={{ left: menu.x, top: menu.y }}
+          style={{
+            // 靠近窗口右/下边缘时翻转，避免菜单显示不全
+            left: Math.min(menu.x, window.innerWidth - 170),
+            top: menu.y + 190 > window.innerHeight ? Math.max(8, menu.y - 190) : menu.y,
+          }}
           onClick={e => e.stopPropagation()}
           onContextMenu={e => e.preventDefault()}
         >
