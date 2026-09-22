@@ -1,6 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import '@fontsource/fraunces/500.css'
+import '@fontsource/fraunces/500-italic.css'
 import '@fontsource/fraunces/700.css'
 import '@fontsource/fraunces/700-italic.css'
 import '@fontsource/ibm-plex-sans/400.css'
