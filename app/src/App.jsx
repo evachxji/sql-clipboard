@@ -49,7 +49,7 @@ function injectVars(text) {
 
 export default function App() {
   const [cells, setCells] = useState([])
-  const [pinned, setPinned] = useState(false) // ??????????
+  const [pinned, setPinned] = useState(false) // 窗口置顶（钉子按钮）
   const [editing, setEditing] = useState(false)
   const [toasts, setToasts] = useState([])
   const [modal, setModal] = useState(null) // {id, display, copy}
@@ -195,11 +195,11 @@ export default function App() {
   return (
     <div className={editing ? 'app editing' : 'app'} onClick={() => setMenu(null)}>
       <div className="titlebar" data-tauri-drag-region>
-        <span className="tb-title" data-tauri-drag-region>SQL ???</span>
+        <span className="tb-title" data-tauri-drag-region>SQL 剪切板</span>
         <div className="tb-btns">
           <button
             className={pinned ? 'tb-btn pin on' : 'tb-btn pin'}
-            title={pinned ? '????' : '??????????'}
+            title={pinned ? '取消置顶' : '置顶（窗口不被遮挡）'}
             onClick={async () => {
               if (!appWindow) return
               const next = !pinned
@@ -212,13 +212,13 @@ export default function App() {
               <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z" />
             </svg>
           </button>
-          <button className="tb-btn" title="???" onClick={() => appWindow?.minimize()}>
+          <button className="tb-btn" title="最小化" onClick={() => appWindow?.minimize()}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 12h14" /></svg>
           </button>
-          <button className="tb-btn" title="??? / ??" onClick={() => appWindow?.toggleMaximize()}>
+          <button className="tb-btn" title="最大化 / 还原" onClick={() => appWindow?.toggleMaximize()}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="6" y="6" width="12" height="12" rx="1.5" /></svg>
           </button>
-          <button className="tb-btn close" title="??" onClick={() => appWindow?.close()}>
+          <button className="tb-btn close" title="关闭" onClick={() => appWindow?.close()}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
