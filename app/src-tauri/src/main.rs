@@ -237,17 +237,27 @@ fn copy_text(text: String) -> Result<(), String> {
 
 // ===================== Java 探测 =====================
 
+/// Windows 下隐藏子进程控制台窗口（CREATE_NO_WINDOW），避免黑窗一闪而过
+fn no_window(cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    #[cfg(not(windows))]
+    let _ = cmd;
+}
+
 fn valid_java(p: &Path) -> bool {
     if !p.is_file() {
         return false;
     }
-    Command::new(p)
-        .arg("-version")
+    let mut cmd = Command::new(p);
+    cmd.arg("-version")
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+        .stderr(Stdio::null());
+    no_window(&mut cmd);
+    cmd.status().map(|s| s.success()).unwrap_or(false)
 }
 
 fn java_from_java_home() -> Option<PathBuf> {
@@ -257,7 +267,10 @@ fn java_from_java_home() -> Option<PathBuf> {
 }
 
 fn java_from_path() -> Option<PathBuf> {
-    let out = Command::new("where").arg("java").output().ok()?;
+    let mut cmd = Command::new("where");
+    cmd.arg("java");
+    no_window(&mut cmd);
+    let out = cmd.output().ok()?;
     let first = String::from_utf8_lossy(&out.stdout).lines().next()?.trim().to_string();
     let p = PathBuf::from(first);
     valid_java(&p).then_some(p)
@@ -277,11 +290,17 @@ fn java_from_registry() -> Option<PathBuf> {
 
 fn reg_java_home(root: &str) -> Option<String> {
     // 先取 CurrentVersion，再取该版本的 JavaHome
-    let out = Command::new("reg").args(["query", root, "/v", "CurrentVersion"]).output().ok()?;
+    let mut cmd = Command::new("reg");
+    cmd.args(["query", root, "/v", "CurrentVersion"]);
+    no_window(&mut cmd);
+    let out = cmd.output().ok()?;
     let text = String::from_utf8_lossy(&out.stdout);
     let ver = text.lines().find_map(|l| l.split("REG_SZ").nth(1).map(|s| s.trim().to_string()))?;
     let key = format!("{}\\{}", root, ver);
-    let out2 = Command::new("reg").args(["query", &key, "/v", "JavaHome"]).output().ok()?;
+    let mut cmd2 = Command::new("reg");
+    cmd2.args(["query", &key, "/v", "JavaHome"]);
+    no_window(&mut cmd2);
+    let out2 = cmd2.output().ok()?;
     String::from_utf8_lossy(&out2.stdout)
         .lines()
         .find_map(|l| l.split("REG_SZ").nth(1).map(|s| s.trim().to_string()))
@@ -307,21 +326,30 @@ fn resolve_java() -> (Option<PathBuf>, bool) {
     (None, true)
 }
 
+/// async 命令：Java 探测会多次启动 JVM（java -version），放到阻塞线程池
 #[tauri::command]
-fn get_java_info() -> JavaInfo {
-    let (p, auto) = resolve_java();
-    JavaInfo { path: p.map(|x| x.to_string_lossy().into_owned()).unwrap_or_default(), auto }
+async fn get_java_info() -> JavaInfo {
+    tauri::async_runtime::spawn_blocking(|| {
+        let (p, auto) = resolve_java();
+        JavaInfo { path: p.map(|x| x.to_string_lossy().into_owned()).unwrap_or_default(), auto }
+    })
+    .await
+    .unwrap_or(JavaInfo { path: String::new(), auto: true })
 }
 
 #[tauri::command]
-fn set_java_path(path: String) -> Result<(), String> {
-    if path.is_empty() {
-        set_setting("java_path", "")
-    } else if valid_java(Path::new(&path)) {
-        set_setting("java_path", &path)
-    } else {
-        Err("路径无效或不是可用的 java.exe".into())
-    }
+async fn set_java_path(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if path.is_empty() {
+            set_setting("java_path", "")
+        } else if valid_java(Path::new(&path)) {
+            set_setting("java_path", &path)
+        } else {
+            Err("路径无效或不是可用的 java.exe".into())
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // ===================== JDBC 桥接子进程 =====================
