@@ -57,6 +57,8 @@ export default function App() {
   const cellEls = useRef(new Map())        // 单元格 id -> DOM 元素，用于 FLIP 动画
   const flipFrom = useRef(null)            // 交换前的位置快照（id -> rect）
   const [dragId, setDragId] = useState(null)    // 正在拖拽的单元格 id
+  const [hintId, setHintId] = useState(null)      // 落点指示线所在单元格
+  const [hintAfter, setHintAfter] = useState(false) // 指示线在该格右侧还是左侧
   const dragRow = useRef(null)                 // 拖拽开始时所在行
   const origOrder = useRef(null)               // 拖拽开始时该行 id 顺序（取消拖拽时还原）
   const [query, setQuery] = useState('')
@@ -154,7 +156,8 @@ export default function App() {
     }))
   }
 
-  // 拖拽悬停：落点是单元格之间的间隙——指针在格子左半则插到它前面，右半则插到它后面。
+  // 拖拽悬停：落点是单元格之间的间隙——指针在格子左半则插到它前面，右半则插到它后面，
+  // 并在该间隙处显示指示线。
   // 不等松手，拖动过程中就实时顺延调整（仅限同一行）。
   const dragOverCell = (e, cell) => {
     const src = cells.find(c => c.id === dragId)
@@ -167,6 +170,8 @@ export default function App() {
     const rect = e.currentTarget.getBoundingClientRect()
     const after = e.clientX > rect.left + rect.width / 2
     const pos = rest.findIndex(c => c.id === cell.id) + (after ? 1 : 0)
+    setHintId(cell.id)
+    setHintAfter(after)
     const srcIdx = list.findIndex(c => c.id === src.id)
     if (pos === srcIdx) return // 已在该间隙，无需重排
     const order = [...rest.slice(0, pos), src, ...rest.slice(pos)]
@@ -177,7 +182,11 @@ export default function App() {
   const endDrag = e => {
     const row = dragRow.current
     if (row !== null) {
-      if (e.dataTransfer.dropEffect === 'none' && origOrder.current) {
+      // 实时顺延后被拖的格子可能正悬在指针下，此时 Chrome 不派发有效 drop，
+      // 所以用指针位置兜底：松手时指针在源行内即算放置成功
+      const el = document.elementFromPoint(e.clientX, e.clientY)
+      const dropped = e.dataTransfer.dropEffect !== 'none' || el?.closest('.row')?.dataset.row === String(row)
+      if (!dropped && origOrder.current) {
         applyOrder(row, origOrder.current)
       } else if (isTauri) {
         const ids = (rows.find(([r]) => r === row)?.[1] ?? []).map(c => c.id)
@@ -187,6 +196,7 @@ export default function App() {
     dragRow.current = null
     origOrder.current = null
     setDragId(null)
+    setHintId(null)
   }
 
   const addCol = async (row, list) => {
@@ -302,13 +312,14 @@ export default function App() {
         )}
         <div className="grid">
         {visibleRows.map(([r, list]) => (
-          <div className="row" key={r}>
+          <div className="row" key={r} data-row={r}>
             {list.map((cell, idx) => {
               const cls = [
                 hasCopy(cell) ? 'cell' : 'note',
                 idx === 0 ? 'lead' : '', // 仅第一列文本格显示 § 节号
                 q && cell.display.toLowerCase().includes(q) ? 'hit' : '',
                 cell.id === dragId ? 'dragging' : '',
+                cell.id === hintId && hintId !== dragId ? (hintAfter ? 'drop-r' : 'drop-l') : '',
               ].join(' ').trim()
               return (
                 <div

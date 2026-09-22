@@ -117,4 +117,7 @@ main{flex:1;overflow:auto;padding:18px 28px}
   cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:50%;line-height:1;z-index:2}
 .cell-x:hover{background:#b3261e;color:#fff}
 /* 编辑模式拖拽排序：源格半透明 */
-.cell.dragging,.note.dragging{opacity:.4;pointer-events:none}
+.cell.dragging,.note.dragging{opacity:.4}
+/* 拖拽落点指示线：目标格左/右边缘的竖线 */
+.cell.drop-l,.note.drop-l{box-shadow:inset 3px 0 0 var(--acc)}
+.cell.drop-r,.note.drop-r{box-shadow:inset -3px 0 0 var(--acc)}
