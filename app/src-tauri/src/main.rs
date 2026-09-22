@@ -35,6 +35,7 @@ struct Preset {
     id: i64,
     name: String,
     sql: String,
+    remarks: String, // 变量备注 JSON：{"cust_no":"客户号"}
 }
 
 #[derive(Serialize)]
@@ -117,6 +118,18 @@ fn open() -> Result<Connection, String> {
         [],
     )
     .map_err(|e| e.to_string())?;
+    // 老库迁移：presets 补 remarks 列（变量备注）
+    let cols: Vec<String> = conn
+        .prepare("PRAGMA table_info(presets)")
+        .map_err(|e| e.to_string())?
+        .query_map([], |r| r.get(1))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<_, _>>()
+        .map_err(|e| e.to_string())?;
+    if !cols.iter().any(|c| c == "remarks") {
+        conn.execute("ALTER TABLE presets ADD COLUMN remarks TEXT NOT NULL DEFAULT ''", [])
+            .map_err(|e| e.to_string())?;
+    }
     // 首次运行放一条示例，方便理解用法
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM cells", [], |r| r.get(0))
@@ -462,9 +475,9 @@ fn delete_connection(id: i64) -> Result<(), String> {
 #[tauri::command]
 fn list_presets() -> Result<Vec<Preset>, String> {
     let conn = open()?;
-    let mut stmt = conn.prepare("SELECT id, name, sql FROM presets ORDER BY id").map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare("SELECT id, name, sql, remarks FROM presets ORDER BY id").map_err(|e| e.to_string())?;
     let list = stmt
-        .query_map([], |r| Ok(Preset { id: r.get(0)?, name: r.get(1)?, sql: r.get(2)? }))
+        .query_map([], |r| Ok(Preset { id: r.get(0)?, name: r.get(1)?, sql: r.get(2)?, remarks: r.get(3)? }))
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
@@ -472,15 +485,15 @@ fn list_presets() -> Result<Vec<Preset>, String> {
 }
 
 #[tauri::command]
-fn save_preset(id: Option<i64>, name: String, sql: String) -> Result<i64, String> {
+fn save_preset(id: Option<i64>, name: String, sql: String, remarks: String) -> Result<i64, String> {
     let conn = open()?;
     match id {
         Some(i) => {
-            conn.execute("UPDATE presets SET name=?1, sql=?2 WHERE id=?3", (name, sql, i)).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE presets SET name=?1, sql=?2, remarks=?3 WHERE id=?4", (name, sql, remarks, i)).map_err(|e| e.to_string())?;
             Ok(i)
         }
         None => {
-            conn.execute("INSERT INTO presets (name, sql) VALUES (?1, ?2)", (name, sql)).map_err(|e| e.to_string())?;
+            conn.execute("INSERT INTO presets (name, sql, remarks) VALUES (?1, ?2, ?3)", (name, sql, remarks)).map_err(|e| e.to_string())?;
             Ok(conn.last_insert_rowid())
         }
     }
@@ -508,27 +521,44 @@ fn import_presets() -> Result<i64, String> {
         if name.is_empty() || sql.is_empty() {
             continue;
         }
-        conn.execute("INSERT INTO presets (name, sql) VALUES (?1, ?2)", (name, sql)).map_err(|e| e.to_string())?;
+        // remarks 允许是 JSON 对象或字符串，省略则为空
+        let remarks = match &item["remarks"] {
+            Value::Object(_) => item["remarks"].to_string(),
+            Value::String(t) => t.clone(),
+            _ => String::new(),
+        };
+        conn.execute("INSERT INTO presets (name, sql, remarks) VALUES (?1, ?2, ?3)", (name, sql, remarks)).map_err(|e| e.to_string())?;
         count += 1;
     }
     Ok(count)
 }
 
+/// async 命令：JVM 启动 + 建连耗时数秒，放到阻塞线程池，避免卡住界面
 #[tauri::command]
-fn test_connection(jar: String, url: String, user: String, password: String) -> TestResult {
-    let req = json!({"cmd": "test", "jar": jar, "url": url, "user": user, "password": password});
-    match bridge_call(req) {
-        Ok(v) => TestResult {
-            ok: v["ok"].as_bool().unwrap_or(false),
-            elapsed_ms: v["elapsedMs"].as_i64().unwrap_or(0),
-            error: v["error"].as_str().unwrap_or_default().into(),
-        },
-        Err(e) => TestResult { ok: false, elapsed_ms: 0, error: e },
-    }
+async fn test_connection(jar: String, url: String, user: String, password: String) -> TestResult {
+    tauri::async_runtime::spawn_blocking(move || {
+        let req = json!({"cmd": "test", "jar": jar, "url": url, "user": user, "password": password});
+        match bridge_call(req) {
+            Ok(v) => TestResult {
+                ok: v["ok"].as_bool().unwrap_or(false),
+                elapsed_ms: v["elapsedMs"].as_i64().unwrap_or(0),
+                error: v["error"].as_str().unwrap_or_default().into(),
+            },
+            Err(e) => TestResult { ok: false, elapsed_ms: 0, error: e },
+        }
+    })
+    .await
+    .unwrap_or_else(|e| TestResult { ok: false, elapsed_ms: 0, error: e.to_string() })
 }
 
 #[tauri::command]
-fn execute_query(jar: String, url: String, user: String, password: String, sql: String, params: Option<std::collections::HashMap<String, String>>) -> QueryResult {
+async fn execute_query(jar: String, url: String, user: String, password: String, sql: String, params: Option<std::collections::HashMap<String, String>>) -> QueryResult {
+    tauri::async_runtime::spawn_blocking(move || execute_query_blocking(jar, url, user, password, sql, params))
+        .await
+        .unwrap_or_else(|e| QueryResult { ok: false, columns: vec![], rows: vec![], truncated: false, update_count: -1, elapsed_ms: 0, error: e.to_string() })
+}
+
+fn execute_query_blocking(jar: String, url: String, user: String, password: String, sql: String, params: Option<std::collections::HashMap<String, String>>) -> QueryResult {
     let fail = |e: String| QueryResult { ok: false, columns: vec![], rows: vec![], truncated: false, update_count: -1, elapsed_ms: 0, error: e };
     let mut req = json!({"cmd": "query", "jar": jar, "url": url, "user": user, "password": password, "sql": sql, "maxRows": 1000});
     if let Some(p) = params {
