@@ -152,7 +152,7 @@ main{flex:1;overflow:auto;padding:18px 28px}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .qerr{background:#fdeceb;border:1px solid #ecc8c5;color:#b3261e;border-radius:10px;
   padding:10px 14px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;word-break:break-all;white-space:pre-wrap}
-.qinfo{background:#e8f5ee;border:1px solid #bfe3cf;color:#1e7d4f;border-radius:10px;padding:10px 14px;font-size:12.5px}
+.qinfo{background:#e8f5ee;border:1px solid #bfe3cf;color:#1e7d4f;border-radius:10px;padding:10px 14px;font-size:12.5px;flex-shrink:0}
 .result-wrap{flex:1;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;
   background:var(--card);overflow:hidden}
 .result-wrap table.result{flex:1;overflow:auto}
@@ -168,7 +168,7 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .result .null{color:var(--mute);font-style:italic}
 .result-status{flex-shrink:0;border-top:1px solid var(--line);padding:7px 14px;font-size:11.5px;color:var(--mute)}
 /* 结果表格滚动：thead/tbody 分离方案改为整体滚动 */
-.result-wrap{overflow:auto}
+.result-body{flex:1;min-height:0;overflow:auto}
 .result-wrap table.result{display:table;overflow:visible}
 .result thead{display:table-header-group;position:sticky;top:0;z-index:1}
 .result tbody{display:table-row-group;overflow:visible;max-height:none}
@@ -210,6 +210,21 @@ main{flex:1;overflow:auto;padding:18px 28px}
   font-size:11.5px;color:var(--mute);cursor:pointer;font-family:inherit;transition:.15s}
 .mini-btn:hover{border-color:var(--acc);color:var(--acc)}
 .import-msg{font-size:11.5px;color:var(--acc)}
+.pick-bar{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--mute);margin-top:6px}
+.pick-count{margin-right:auto}
+.pick-link{border:none;background:none;color:var(--acc);font-size:12px;cursor:pointer;padding:0}
+.pick-link:hover{text-decoration:underline}
+.pick-list{max-height:320px;overflow-y:auto;border:1.5px solid var(--line);border-radius:10px;margin-top:8px}
+.pick-row{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
+.pick-row:last-child{border-bottom:none}
+.pick-row:hover{background:var(--acc-soft)}
+.pick-row.disabled{opacity:.55;cursor:default}
+.pick-row.disabled:hover{background:none}
+.pick-row input{accent-color:var(--acc);pointer-events:none}
+.pick-main{display:flex;flex-direction:column;min-width:0;gap:2px}
+.pick-name{font-size:13px;color:var(--ink)}
+.pick-hint{font-style:normal;font-size:11px;color:#b3261e;margin-left:8px}
+.pick-sub{font-size:11px;color:var(--mute);font-family:'IBM Plex Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .preset-empty{color:var(--mute);font-size:12.5px;padding:8px 0}
 .preset-cells{display:flex;flex-wrap:wrap;gap:10px}
 @keyframes pcell-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -247,10 +262,25 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .conn-warming{margin-left:8px;color:var(--acc)}
 /* 已执行 SQL 展示 */
 .run-sql{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mute);
-  padding:7px 14px;border-bottom:1px solid var(--line);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.editor-toggle{font-size:12px;color:var(--mute);cursor:pointer;user-select:none;margin-top:4px}
-.editor-toggle:hover{color:var(--acc)}
+  padding:7px 14px;border-bottom:1px solid var(--line);flex-shrink:0;
+  white-space:pre-wrap;word-break:break-all;max-height:78px;overflow-y:auto}
+/* 结果标签栏 */
+.rtabs{display:flex;flex-shrink:0;gap:2px;padding:6px 8px 0;border-bottom:1px solid var(--line);overflow-x:auto;
+  scrollbar-width:none;background:var(--paper)}
+.rtabs::-webkit-scrollbar{display:none}
+.rtab{display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:12px;color:var(--mute);cursor:pointer;
+  border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;white-space:nowrap;user-select:none}
+.rtab:hover{color:var(--acc)}
+.rtab.on{background:var(--card);border-color:var(--line);color:var(--ink);font-weight:600;margin-bottom:-1px}
+.rtab-x{width:14px;height:14px;font-size:12px;color:var(--mute);border-radius:50%;display:flex;align-items:center;justify-content:center}
+.rtab-x:hover{background:var(--acc-soft);color:#b3261e}
+.wrap-err{border-radius:0;border-left:none;border-right:none;flex-shrink:0}
+/* 结果标签：执行中 loading */
+.rtab .spin{margin-right:0;font-size:11px}
+.rtab-loading{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  color:var(--mute);font-size:13px;min-height:140px}
+.rtab-loading .spin{font-size:22px;margin:0}
+.rtab-loading .elapsed{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--acc)}
 /* 编辑模式：单元格右上角删除按钮 */
 .note{position:relative}
 .cell-x{position:absolute;top:2px;right:4px;width:14px;height:14px;font-size:9px;color:var(--mute);
