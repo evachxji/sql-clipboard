@@ -13,6 +13,7 @@ serde_json = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 arboard = "3"
 rfd = "0.15"
+local-ip-address = "0.6"
 
 [profile.release]
 opt-level = 2
