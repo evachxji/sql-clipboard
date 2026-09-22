@@ -116,7 +116,7 @@ export default function App() {
     else setCells(cs => cs.filter(c => c.id !== cell.id))
   }
 
-  // 拖拽交换两个单元格的位置（行/列互换），并用 FLIP 动画平滑过渡
+  // 拖拽移动与 FLIP 平滑动画
   const snapshotRects = () => {
     const m = new Map()
     cellEls.current.forEach((el, id) => m.set(id, el.getBoundingClientRect()))
@@ -143,14 +143,21 @@ export default function App() {
     })
   }, [cells, level])
 
-  const swapCells = async (a, b) => {
-    if (!a || !b || a.id === b.id) return
+  // 拖拽移动单元格：仅限同一行内；拖到目标格上则插入到该位置，其余格子顺延
+  const moveCell = async (a, b) => {
+    if (!a || !b || a.id === b.id || a.row !== b.row) return
+    const list = rows.find(([r]) => r === a.row)?.[1] ?? []
+    const rest = list.filter(c => c.id !== a.id)
+    // 向右拖放到目标格之后，向左拖放到目标格之前
+    const bi = rest.findIndex(c => c.id === b.id)
+    const insertAt = a.col < b.col ? bi + 1 : bi
+    const order = [...rest.slice(0, insertAt), a, ...rest.slice(insertAt)]
     flipFrom.current = snapshotRects()
-    setCells(cs => cs.map(c =>
-      c.id === a.id ? { ...c, row: b.row, col: b.col } :
-      c.id === b.id ? { ...c, row: a.row, col: a.col } : c
-    ))
-    if (isTauri) await invoke('swap_cells', { idA: a.id, idB: b.id })
+    setCells(cs => cs.map(c => {
+      const ni = order.findIndex(o => o.id === c.id)
+      return ni >= 0 ? { ...c, col: ni } : c
+    }))
+    if (isTauri) await invoke('reorder_row', { row: a.row, ids: order.map(c => c.id) })
   }
 
   const addCol = async (row, list) => {
@@ -284,9 +291,12 @@ export default function App() {
                   draggable={editing}
                   onDragStart={e => { setDragId(cell.id); e.dataTransfer.effectAllowed = 'move' }}
                   onDragEnd={() => { setDragId(null); setDropId(null) }}
-                  onDragOver={editing ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropId(cell.id) } : undefined}
+                  onDragOver={editing ? e => {
+                    const src = cells.find(c => c.id === dragId)
+                    if (src && src.row === cell.row) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropId(cell.id) }
+                  } : undefined}
                   onDragLeave={() => setDropId(d => (d === cell.id ? null : d))}
-                  onDrop={editing ? e => { e.preventDefault(); swapCells(cells.find(c => c.id === dragId), cell); setDragId(null); setDropId(null) } : undefined}
+                  onDrop={editing ? e => { e.preventDefault(); moveCell(cells.find(c => c.id === dragId), cell); setDragId(null); setDropId(null) } : undefined}
                   onClick={() => clickCell(cell)}
                   onContextMenu={e => openMenu(e, cell)}
                 >
