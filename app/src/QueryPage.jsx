@@ -560,14 +560,12 @@ function ParamModal({ preset, values, onChange, running, connecting, onClose, on
   return (
     <div className="box">
       <h3>{preset.name}</h3>
-      <div className="pm-hint">
-        {manualVars.length > 0 && <div>未填写的条件将自动忽略，至少填写一个。</div>}
-        {legacyParams.length > 0 && <div>旧版 :param 参数需全部填写。</div>}
-        <div>日期变量 $zt（昨天）/ $syd（上月底）自动注入。</div>
-      </div>
+      {legacyParams.length > 0 && (
+        <div className="pm-hint"><div>旧版 :param 参数需全部填写。</div></div>
+      )}
       {manualVars.map(n => (
         <label key={n} className="pm-field">
-          <span className="pm-label">{rem[n] || n}<code>${n}</code></span>
+          <span className="pm-label">{rem[n] || n}</span>
           <input
             className="finput mono"
             value={values[n] || ''}
