@@ -443,8 +443,17 @@ function ConnModal({ init, javaInfo, onJavaChange, onClose, onSave }) {
   const [f, setF] = useState({ ...init })
   const [err, setErr] = useState('')
   const [javaPath, setJavaPath] = useState('')
+  const [testSt, setTestSt] = useState(null) // null | {st:'run'|'ok'|'err', msg}
   const set = (k, v) => setF(x => ({ ...x, [k]: v }))
   const incomplete = !f.name.trim() || !f.jar || !f.url.trim()
+
+  const test = async () => {
+    setTestSt({ st: 'run', msg: '连接中' })
+    const r = await invoke('test_connection', { jar: f.jar, url: f.url.trim(), user: f.user, password: f.password })
+    setTestSt(r.ok
+      ? { st: 'ok', msg: `连接成功 · ${r.elapsedMs}ms` }
+      : { st: 'err', msg: r.error || '连接失败' })
+  }
 
   const pickJar = async () => {
     const p = await invoke('pick_jar')
@@ -492,7 +501,19 @@ function ConnModal({ init, javaInfo, onJavaChange, onClose, onSave }) {
       </div>
       {err && <div className="err">{err}</div>}
       <div className="actions">
-        <span />
+        <span className="test-area">
+          <button className="btn" disabled={!f.jar || !f.url.trim() || (testSt && testSt.st === 'run')} onClick={test}>
+            测试连接
+          </button>
+          {testSt && (
+            <span className={'cc-status ' + testSt.st}>
+              {testSt.st === 'run' && <span className="spin">§</span>}
+              {testSt.st === 'ok' && '✓ '}
+              {testSt.st === 'err' && '✗ '}
+              {testSt.msg}
+            </span>
+          )}
+        </span>
         <span>
           <button className="btn" onClick={onClose}>取消</button>
           <button className="btn save" disabled={incomplete} onClick={save}>保存</button>
