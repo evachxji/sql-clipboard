@@ -7,6 +7,17 @@ html,body,#root{height:100%}
 body{background:var(--paper);color:var(--ink);overflow:hidden}
 .app{height:100vh;display:flex;flex-direction:column;
   background-image:radial-gradient(rgba(179,84,30,.05) 1px,transparent 1px);background-size:26px 26px}
+/* ????????????????? ??(??)/???/???/?? */
+.titlebar{display:flex;align-items:center;justify-content:space-between;height:34px;flex-shrink:0;
+  background:var(--card);border-bottom:1px solid var(--line);user-select:none}
+.tb-title{padding-left:14px;font-size:12px;color:var(--mute);letter-spacing:1px;cursor:default}
+.tb-btns{display:flex;height:100%}
+.tb-btn{width:44px;border:none;background:none;color:var(--ink);cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;justify-content:center;transition:.15s}
+.tb-btn:hover{background:var(--acc-soft)}
+.tb-btn.close:hover{background:#e81123;color:#fff}
+.tb-btn.pin.on{color:var(--acc);background:var(--acc-soft)}
+.tb-btn svg{width:14px;height:14px;display:block}
 header{display:flex;align-items:center;gap:16px;padding:14px 28px 12px;border-bottom:1px solid var(--line);background:var(--card)}
 h1{font-family:'Fraunces','Microsoft YaHei',serif;font-size:22px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
 h1 em{font-style:italic;color:var(--acc)}
@@ -221,3 +232,6 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .cell-x{position:absolute;top:2px;right:4px;width:14px;height:14px;font-size:9px;color:var(--mute);
   cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:50%;line-height:1;z-index:2}
 .cell-x:hover{background:#b3261e;color:#fff}
+/* 编辑模式拖拽交换：源格半透明，目标格描边提示 */
+.cell.dragging,.note.dragging{opacity:.4}
+.cell.drop-hint,.note.drop-hint{outline:2px solid var(--acc);outline-offset:2px}
