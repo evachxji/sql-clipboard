@@ -42,7 +42,7 @@ main{flex:1;overflow:auto;padding:18px 28px}
   box-shadow:0 1px 2px rgba(33,29,21,.05)}
 .cell .d{max-width:230px}
 .cell::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--line);transition:.18s}
-.cell .d{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .d{font-weight:600;font-size:13px;white-space:normal;overflow-wrap:break-word;word-break:break-all;line-height:1.5}
 .cell:hover{box-shadow:0 4px 12px rgba(33,29,21,.1);border-color:var(--acc)}
 .cell:hover::before{background:var(--acc)}
 .cell.hit{border-color:var(--acc)}
@@ -52,7 +52,7 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .app.editing .cell::before{background:var(--acc)}
 /* 词条文本格（复制值为空）：§ 节号 + 虚线下划，点击复制显示值 */
 .note{display:table-cell;vertical-align:middle;max-width:240px;padding:3px 2px;cursor:pointer}
-.note .d{max-width:230px;font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+.note .d{max-width:230px;font-size:13px;color:var(--mute);white-space:normal;overflow-wrap:break-word;word-break:break-all;line-height:1.5;
   border-bottom:1.5px dotted rgba(138,129,114,.55);padding-bottom:2px;transition:.15s}
 .note.lead .d::before{content:"§";color:var(--acc);margin-right:7px;font-size:12px}
 .note:hover .d{color:var(--ink);border-bottom-color:var(--acc)}
@@ -133,12 +133,6 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .cc-url{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--mute);margin-top:3px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cc-jar{font-size:10.5px;color:var(--blue);margin-top:2px}
-.cc-btns{display:flex;gap:6px;margin-top:8px}
-.cc-btns button{padding:3px 10px;border:1px solid var(--line);border-radius:20px;background:var(--card);
-  font-size:11.5px;color:var(--ink);cursor:pointer;font-family:inherit;transition:.15s}
-.cc-btns button:hover{border-color:var(--acc);color:var(--acc)}
-.cc-btns button.danger{color:#b3261e}
-.cc-btns button.danger:hover{background:#b3261e;color:#fff;border-color:#b3261e}
 .cc-status{font-size:11.5px;margin-top:6px;font-family:'IBM Plex Mono',monospace;word-break:break-all}
 .cc-status.run{color:var(--mute)}.cc-status.ok{color:#1e7d4f}.cc-status.err{color:#b3261e}
 .qmain{flex:1;display:flex;flex-direction:column;padding:16px 18px;gap:10px;overflow:hidden}
@@ -276,8 +270,24 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .rtab-x:hover{background:var(--acc-soft);color:#b3261e}
 .wrap-err{border-radius:0;border-left:none;border-right:none;flex-shrink:0}
 /* 正式版 IP 白名单拦截屏 */
-.ip-block{position:fixed;inset:0;background:var(--paper);color:var(--ink);z-index:99;
-  display:flex;align-items:center;justify-content:center;font-size:16px;letter-spacing:1px}
+.ip-block{position:fixed;inset:0;background:var(--paper);z-index:99;display:flex;align-items:center;justify-content:center;
+  background-image:radial-gradient(rgba(179,84,30,.06) 1px,transparent 1px);background-size:26px 26px}
+.ipb-close{position:absolute;top:0;right:0;width:44px;height:34px;border:none;background:none;color:var(--ink);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.ipb-close svg{width:14px;height:14px;display:block}
+.ipb-close:hover{background:#e81123;color:#fff}
+.ipb-card{display:flex;flex-direction:column;align-items:center;text-align:center;background:var(--card);
+  border:1px solid var(--line);border-radius:20px;padding:42px 64px;box-shadow:0 24px 60px rgba(33,29,21,.12);
+  animation:ipb-up .5s cubic-bezier(.2,.9,.3,1.15) both}
+@keyframes ipb-up{from{transform:translateY(18px) scale(.97);opacity:0}}
+.ipb-eyebrow{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--mute);font-weight:600}
+.ipb-icon{width:52px;height:52px;color:var(--acc);margin:16px 0 8px}
+.ipb-icon svg{width:100%;height:100%}
+.ipb-title{font-family:'Fraunces','Microsoft YaHei',serif;font-size:26px;color:var(--ink)}
+.ipb-sub{font-size:13.5px;color:var(--mute);margin-top:8px;letter-spacing:1px}
+.ipb-exit{margin-top:26px;padding:9px 34px;border:none;border-radius:20px;background:var(--acc);color:#fff;
+  font-size:13.5px;font-family:inherit;cursor:pointer;letter-spacing:2px;transition:.15s}
+.ipb-exit:hover{background:#9a4618;transform:translateY(-1px)}
 /* 结果标签：执行中 loading */
 .rtab .spin{margin-right:0;font-size:11px}
 .rtab-loading{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
