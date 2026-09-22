@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import QueryPage from './QueryPage.jsx'
+import { OFFICIAL } from './edition.js'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
@@ -53,8 +54,8 @@ export default function App() {
   const [pinned, setPinned] = useState(false) // 窗口置顶（钉子按钮）
   const [editing, setEditing] = useState(false)
   const [toasts, setToasts] = useState([])
-  const [tab, setTab] = useState('clip')
-  const [queryMounted, setQueryMounted] = useState(false) // 首次进入后保持挂载，避免来回切换重新建连
+  const [tab, setTab] = useState(OFFICIAL ? 'query' : 'clip')
+  const [queryMounted, setQueryMounted] = useState(OFFICIAL) // 首次进入后保持挂载，避免来回切换重新建连
   const switchTab = t => { setTab(t); if (t === 'query') setQueryMounted(true) }
   const [modal, setModal] = useState(null) // {id, display, copy}
   const [menu, setMenu] = useState(null)   // {x, y, cell}
@@ -77,6 +78,16 @@ export default function App() {
     else setCells(MOCK)
   }, [])
   useEffect(() => { load() }, [load])
+
+  // 正式版：IP 白名单校验，不在名单内则整屏拦截（标准版不校验）
+  const [ipBlock, setIpBlock] = useState(false)
+  useEffect(() => {
+    if (OFFICIAL && isTauri) {
+      invoke('check_ip_allowed')
+        .then(ok => setIpBlock(!ok))
+        .catch(() => setIpBlock(true))
+    }
+  }, [])
 
   const rows = useMemo(() => {
     const m = new Map()
@@ -244,9 +255,10 @@ export default function App() {
 
   return (
     <div className={editing ? 'app editing' : 'app'} onClick={() => setMenu(null)}>
-      <div className="titlebar" data-tauri-drag-region>
+      {ipBlock && <div className="ip-block">网络连接失败，请联系科技管理员</div>}
+      <div className="titlebar" data-tauri-drag-region onDoubleClick={() => appWindow?.toggleMaximize()}>
         <span className="tb-title" data-tauri-drag-region>SQL 剪切板</span>
-        <div className="tb-btns">
+        <div className="tb-btns" onDoubleClick={e => e.stopPropagation()}>
           <button
             className={pinned ? 'tb-btn pin on' : 'tb-btn pin'}
             title={pinned ? '取消置顶' : '置顶（窗口不被遮挡）'}
@@ -276,10 +288,12 @@ export default function App() {
       <header>
         <h1><em>SQL 剪切板</em></h1>
         <div className="sub">Clipboard</div>
+        {!OFFICIAL && (
         <div className="tabs">
           <button className={tab === 'clip' ? 'tab on' : 'tab'} onClick={() => switchTab('clip')}>剪切板</button>
           <button className={tab === 'query' ? 'tab on' : 'tab'} onClick={() => switchTab('query')}>查询执行</button>
         </div>
+        )}
         {tab === 'clip' && (<>
         <div className="f-wrap">
           <input
