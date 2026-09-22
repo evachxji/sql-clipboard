@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
 const base = p => (p || '').split(/[\\/]/).pop()
@@ -109,12 +109,16 @@ export default function QueryPage() {
   const [presets, setPresets] = useState([])
   const [presetModal, setPresetModal] = useState(null) // {id?,name,sql,remarks}
   const [importMsg, setImportMsg] = useState('')
+  const [pickModal, setPickModal] = useState(null) // 导入/导出勾选弹窗 {title, okText, items, onOk}
   const [runPreset, setRunPreset] = useState(null) // 待填变量的预设
   const [paramValues, setParamValues] = useState({})
   const [sql, setSql] = useState('')
   const [showEditor, setShowEditor] = useState(false)
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null) // {…execute_query 返回, label, sqlText}
+  const [results, setResults] = useState([]) // 每次执行结果一个标签 [{key, label, r}]
+  const [activeKey, setActiveKey] = useState(null)
+  const [pageErr, setPageErr] = useState('')
+  const tabSeq = useRef(0) // {…execute_query 返回, label, sqlText}
   const [menu, setMenu] = useState(null)   // 右键菜单 {x, y, items:[{label,danger,action}]}
   const [confirm, setConfirm] = useState(null) // 删除二次确认 {text, action}
 
@@ -123,18 +127,18 @@ export default function QueryPage() {
       const list = await invoke('list_connections')
       setConns(list)
       if (list.length && !list.some(c => c.id === sel)) setSel(list[0].id)
-    } catch (e) { setResult({ error: 'list_connections 失败: ' + String(e) }) }
+    } catch (e) { setPageErr('list_connections 失败: ' + String(e)) }
   }, [sel])
 
   const loadPresets = useCallback(async () => {
     try { setPresets(await invoke('list_presets')) }
-    catch (e) { setResult({ error: 'list_presets 失败: ' + String(e) }) }
+    catch (e) { setPageErr('list_presets 失败: ' + String(e)) }
   }, [])
 
   useEffect(() => {
     loadConns()
     loadPresets()
-    invoke('get_java_info').then(setJavaInfo).catch(e => setResult({ error: 'get_java_info 失败: ' + String(e) }))
+    invoke('get_java_info').then(setJavaInfo).catch(e => setPageErr('get_java_info 失败: ' + String(e)))
   }, []) // eslint-disable-line
 
   /** 测试 / 预热连接：异步命令，不阻塞界面 */
@@ -153,22 +157,57 @@ export default function QueryPage() {
     if (c && !connStatus[c.id]) testConn(c)
   }, [sel, conns]) // eslint-disable-line
 
+  // 执行中的标签每 500ms 刷新「已执行 N 秒」
+  useEffect(() => {
+    const t = setInterval(() => {
+      setResults(list => list.some(x => x.st === 'run')
+        ? list.map(x => x.st === 'run' ? { ...x, elapsed: Math.floor((Date.now() - x.startedAt) / 1000) } : x)
+        : list)
+    }, 500)
+    return () => clearInterval(t)
+  }, [])
+
   const delConn = async (c) => {
     await invoke('delete_connection', { id: c.id })
     setConnStatus(t => { const n = { ...t }; delete n[c.id]; return n })
     await loadConns()
   }
 
+  const flash = (msg, ms = 2500) => {
+    setImportMsg(msg)
+    setTimeout(() => setImportMsg(''), ms)
+  }
+
   const importPresets = async () => {
     try {
-      const n = await invoke('import_presets')
-      setImportMsg(n > 0 ? `已导入 ${n} 条` : '未导入')
-      if (n > 0) await loadPresets()
-      setTimeout(() => setImportMsg(''), 2500)
-    } catch (e) {
-      setImportMsg(String(e))
-      setTimeout(() => setImportMsg(''), 4000)
-    }
+      const items = await invoke('read_presets_file')
+      if (!items.length) { flash('未导入'); return }
+      setPickModal({
+        title: '导入预设查询',
+        okText: '导入',
+        items: items.map((it, i) => ({ key: i, name: it.name, sub: it.sql, disabled: it.dup, hint: it.dup ? '重名跳过' : '', raw: it })),
+        onOk: async (picked) => {
+          const n = await invoke('import_presets', { items: picked.map(p => p.raw) })
+          await loadPresets()
+          flash(n > 0 ? `已导入 ${n} 条` : '未导入')
+        },
+      })
+    } catch (e) { flash(String(e), 4000) }
+  }
+
+  const exportPresets = () => {
+    if (!presets.length) { flash('没有可导出的查询'); return }
+    setPickModal({
+      title: '导出预设查询',
+      okText: '导出',
+      items: presets.map(p => ({ key: p.id, name: p.name, sub: p.sql })),
+      onOk: async (picked) => {
+        try {
+          const n = await invoke('export_presets', { ids: picked.map(p => p.key) })
+          flash(n > 0 ? `已导出 ${n} 条` : '已取消')
+        } catch (e) { flash(String(e), 4000) }
+      },
+    })
   }
 
   const delPreset = async (p) => {
@@ -181,20 +220,30 @@ export default function QueryPage() {
   const selStatus = sel ? connStatus[sel] : null
 
   const runNow = async (template, values, label) => {
-    if (!selConn) { setResult({ error: '请先在左侧选择或新建一个连接' }); return }
+    if (!selConn) { setPageErr('请先在左侧选择或新建一个连接'); return }
     const { sql: finalSql } = buildSql(template, values || {})
-    if (!finalSql.trim()) { setResult({ error: '生成的 SQL 为空' }); return }
+    if (!finalSql.trim()) { setPageErr('生成的 SQL 为空'); return }
     // 模板处理后剩余的 :param 走 JDBC 命名参数绑定（兼容旧预设）
     const legacy = {}
     for (const n of extractParams(finalSql)) legacy[n] = (values && values[n]) || ''
     setRunning(true)
-    setResult(null)
+    setPageErr('')
+    // 先创建标签（loading 态），执行完成后再回填结果
+    const key = ++tabSeq.current
+    setResults(list => [...list, { key, label, st: 'run', startedAt: Date.now(), elapsed: 0, r: null }])
+    setActiveKey(key)
     const r = await invoke('execute_query', {
       jar: selConn.jar, url: selConn.url, user: selConn.user, password: selConn.password,
       sql: finalSql, params: Object.keys(legacy).length ? legacy : null,
     })
-    setResult({ ...r, label, sqlText: finalSql })
+    setResults(list => list.map(t => t.key === key ? { ...t, st: 'done', r: { ...r, sqlText: finalSql } } : t))
     setRunning(false)
+  }
+
+  const closeTab = (key) => {
+    const rest = results.filter(t => t.key !== key)
+    setResults(rest)
+    if (key === activeKey) setActiveKey(rest.length ? rest[rest.length - 1].key : null)
   }
 
   const openMenu = (e, items) => {
@@ -205,8 +254,7 @@ export default function QueryPage() {
   const askDelete = (text, action) => setConfirm({ text, action })
 
   const clickPreset = (p) => {
-    if (!selConn) { setResult({ error: '请先在左侧选择或新建一个连接' }); return }
-    setResult(null)
+    if (!selConn) { setPageErr('请先在左侧选择或新建一个连接'); return }
     if (extractVars(p.sql).length || extractParams(p.sql).length) {
       setParamValues({})
       setRunPreset(p)
@@ -214,6 +262,8 @@ export default function QueryPage() {
       runNow(p.sql, {}, p.name)
     }
   }
+
+  const curResult = results.find(t => t.key === activeKey) || results[results.length - 1]
 
   return (
     <div className="qwrap" onClick={() => setMenu(null)}>
@@ -258,6 +308,8 @@ export default function QueryPage() {
           <span className="sec-actions">
             {importMsg && <span className="import-msg">{importMsg}</span>}
             <button className="mini-btn" onClick={importPresets}>导入</button>
+            <button className="mini-btn" onClick={exportPresets}>导出</button>
+            <button className="mini-btn" onClick={() => setShowEditor(s => !s)}>自定义 SQL {showEditor ? '▾' : '▸'}</button>
             <button className="mini-btn accent" onClick={() => setPresetModal({ name: '', sql: '', remarks: '' })}>＋ 新建查询</button>
           </span>
         </div>
@@ -289,9 +341,6 @@ export default function QueryPage() {
           })}
         </div>
 
-        <div className="editor-toggle" onClick={() => setShowEditor(s => !s)}>
-          自定义 SQL {showEditor ? '▾' : '▸'}
-        </div>
         {showEditor && (
           <>
             <textarea
@@ -316,27 +365,46 @@ export default function QueryPage() {
           </>
         )}
 
-        {result && result.error && <div className="qerr">{result.error}</div>}
-        {result && !result.error && (
+        {pageErr && <div className="qerr">{pageErr}</div>}
+        {curResult && (
           <div className="result-wrap">
-            {result.sqlText && <div className="run-sql" title={result.sqlText}>{result.label ? result.label + ' · ' : ''}{result.sqlText}</div>}
-            {result.updateCount >= 0
-              ? <div className="qinfo">执行成功，影响行数：{result.updateCount} · {result.elapsedMs}ms</div>
+            <div className="rtabs" onWheel={e => { e.currentTarget.scrollLeft += e.deltaY }}>
+              {results.map(t => (
+                <div key={t.key} className={'rtab' + (t.key === curResult.key ? ' on' : '')} onClick={() => setActiveKey(t.key)}>
+                  {t.st === 'run' && <span className="spin">§</span>}
+                  <span>{t.label}</span>
+                  <span className="rtab-x" title="关闭" onClick={e => { e.stopPropagation(); closeTab(t.key) }}>×</span>
+                </div>
+              ))}
+            </div>
+            {curResult.st === 'run' && (
+              <div className="rtab-loading">
+                <span className="spin">§</span>
+                <div>正在执行查询…</div>
+                <div className="elapsed">已执行 {curResult.elapsed} 秒</div>
+              </div>
+            )}
+            {curResult.st !== 'run' && curResult.r.sqlText && <div className="run-sql" title={curResult.r.sqlText}>{curResult.r.sqlText}</div>}
+            {curResult.st !== 'run' && curResult.r.error && <div className="qerr wrap-err">{curResult.r.error}</div>}
+            {curResult.st !== 'run' && !curResult.r.error && (curResult.r.updateCount >= 0
+              ? <div className="qinfo">执行成功，影响行数：{curResult.r.updateCount} · {curResult.r.elapsedMs}ms</div>
               : (
                 <>
-                  <table className="result">
-                    <thead><tr>{result.columns.map((c, i) => <th key={i}>{c}</th>)}</tr></thead>
-                    <tbody>
-                      {result.rows.map((r, i) => (
-                        <tr key={i}>{r.map((v, j) => <td key={j}>{v === null ? <span className="null">NULL</span> : v}</td>)}</tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="result-body">
+                    <table className="result">
+                      <thead><tr>{curResult.r.columns.map((c, i) => <th key={i}>{c}</th>)}</tr></thead>
+                      <tbody>
+                        {curResult.r.rows.map((row, i) => (
+                          <tr key={i}>{row.map((v, j) => <td key={j}>{v === null ? <span className="null">NULL</span> : v}</td>)}</tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                   <div className="result-status">
-                    {result.rows.length} 行 · {result.elapsedMs}ms{result.truncated ? ' · 已截断（上限 1000 行）' : ''}
+                    {curResult.r.rows.length} 行 · {curResult.r.elapsedMs}ms{curResult.r.truncated ? ' · 已截断（上限 1000 行）' : ''}
                   </div>
                 </>
-              )}
+              ))}
           </div>
         )}
       </section>
@@ -363,6 +431,17 @@ export default function QueryPage() {
             init={presetModal}
             onClose={() => setPresetModal(null)}
             onSave={async () => { setPresetModal(null); await loadPresets() }}
+          />
+        </div>
+      )}
+      {pickModal && (
+        <div className="mask" onMouseDown={e => e.target === e.currentTarget && setPickModal(null)}>
+          <PickModal
+            title={pickModal.title}
+            okText={pickModal.okText}
+            items={pickModal.items}
+            onClose={() => setPickModal(null)}
+            onOk={async (picked) => { setPickModal(null); await pickModal.onOk(picked) }}
           />
         </div>
       )}
@@ -422,6 +501,47 @@ export default function QueryPage() {
   )
 }
 
+/** 导入/导出勾选弹窗：disabled 项（如重名）不可选 */
+function PickModal({ title, okText, items, onClose, onOk }) {
+  const [checked, setChecked] = useState(() => new Set(items.filter(i => !i.disabled).map(i => i.key)))
+  const toggle = (key) => setChecked(s => {
+    const n = new Set(s)
+    if (n.has(key)) n.delete(key); else n.add(key)
+    return n
+  })
+  const pickable = items.filter(i => !i.disabled)
+
+  return (
+    <div className="box">
+      <h3>{title}</h3>
+      <div className="pick-bar">
+        <span className="pick-count">已选 {checked.size} / {items.length} 条</span>
+        <button className="pick-link" onClick={() => setChecked(new Set(pickable.map(i => i.key)))}>全选</button>
+        <button className="pick-link" onClick={() => setChecked(new Set())}>清空</button>
+      </div>
+      <div className="pick-list">
+        {items.map(it => (
+          <div key={it.key} className={'pick-row' + (it.disabled ? ' disabled' : '')} onClick={() => !it.disabled && toggle(it.key)}>
+            <input type="checkbox" disabled={it.disabled} checked={checked.has(it.key)} readOnly />
+            <span className="pick-main">
+              <span className="pick-name">{it.name}{it.hint ? <em className="pick-hint">{it.hint}</em> : null}</span>
+              <span className="pick-sub">{it.sub}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="actions">
+        <span />
+        <span>
+          <button className="btn" onClick={onClose}>取消</button>
+          <button className="btn save" disabled={checked.size === 0} onClick={() => onOk(items.filter(i => checked.has(i.key)))}>
+            {okText}（{checked.size}）
+          </button>
+        </span>
+      </div>
+    </div>
+  )
+}
 /** 预设执行弹窗：按备注提示输入变量值 */
 function ParamModal({ preset, values, onChange, running, connecting, onClose, onRun }) {
   const manualVars = extractVars(preset.sql)
