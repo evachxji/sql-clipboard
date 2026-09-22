@@ -50,6 +50,7 @@ struct TestResult {
     #[serde(rename = "elapsedMs")]
     elapsed_ms: i64,
     error: String,
+    info: String, // 数据库产品名+版本，如 "MySQL 8.0.36"
 }
 
 #[derive(Serialize)]
@@ -571,12 +572,13 @@ async fn test_connection(jar: String, url: String, user: String, password: Strin
                 ok: v["ok"].as_bool().unwrap_or(false),
                 elapsed_ms: v["elapsedMs"].as_i64().unwrap_or(0),
                 error: v["error"].as_str().unwrap_or_default().into(),
+                info: v["dbInfo"].as_str().unwrap_or_default().into(),
             },
-            Err(e) => TestResult { ok: false, elapsed_ms: 0, error: e },
+            Err(e) => TestResult { ok: false, elapsed_ms: 0, error: e, info: String::new() },
         }
     })
     .await
-    .unwrap_or_else(|e| TestResult { ok: false, elapsed_ms: 0, error: e.to_string() })
+    .unwrap_or_else(|e| TestResult { ok: false, elapsed_ms: 0, error: e.to_string(), info: String::new() })
 }
 
 #[tauri::command]

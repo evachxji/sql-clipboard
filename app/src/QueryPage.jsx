@@ -506,7 +506,7 @@ function ConnModal({ init, javaInfo, onJavaChange, onClose, onSave }) {
     setTestSt({ st: 'run', msg: '连接中' })
     const r = await invoke('test_connection', { jar: f.jar, url: f.url.trim(), user: f.user, password: f.password })
     setTestSt(r.ok
-      ? { st: 'ok', msg: `连接成功 · ${r.elapsedMs}ms` }
+      ? { st: 'ok', msg: `连接成功${r.info ? ' · ' + r.info : ''} · ${r.elapsedMs}ms` }
       : { st: 'err', msg: r.error || '连接失败' })
   }
 
