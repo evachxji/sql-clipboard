@@ -641,7 +641,7 @@ fn check_ip_allowed() -> bool {
         return true; // 标准版不限制
     }
     let wl = option_env!("IP_WHITELIST").unwrap_or_default();
-    let list: Vec<&str> = wl.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+    let list: Vec<&str> = wl.split([',', ';']).map(str::trim).filter(|s| !s.is_empty()).collect(); // 兼容逗号/分号分隔
     if list.is_empty() {
         return true;
     }
