@@ -12,6 +12,9 @@ __pycache__/
 # 打包成品（不入库，通过 Release 分发）
 dist/
 便携版/
-# 查询执行分支的构建/测试产物（本地保留，不入库）
-app/src-tauri/bridge/
+app/src-tauri/bridge/classes/
+app/src-tauri/bridge/jdbc-bridge.jar
 test-libs/
+
+# 本地 IP 白名单配置（含内网地址，不入库）
+.env

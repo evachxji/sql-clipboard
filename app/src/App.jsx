@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import QueryPage from './QueryPage.jsx'
+import { OFFICIAL } from './edition.js'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
@@ -52,6 +54,9 @@ export default function App() {
   const [pinned, setPinned] = useState(false) // 窗口置顶（钉子按钮）
   const [editing, setEditing] = useState(false)
   const [toasts, setToasts] = useState([])
+  const [tab, setTab] = useState(OFFICIAL ? 'query' : 'clip')
+  const [queryMounted, setQueryMounted] = useState(OFFICIAL) // 首次进入后保持挂载，避免来回切换重新建连
+  const switchTab = t => { setTab(t); if (t === 'query') setQueryMounted(true) }
   const [modal, setModal] = useState(null) // {id, display, copy}
   const [menu, setMenu] = useState(null)   // {x, y, cell}
   const cellEls = useRef(new Map())        // 单元格 id -> DOM 元素，用于 FLIP 动画
@@ -73,6 +78,16 @@ export default function App() {
     else setCells(MOCK)
   }, [])
   useEffect(() => { load() }, [load])
+
+  // 正式版：IP 白名单校验，不在名单内则整屏拦截（标准版不校验）
+  const [ipBlock, setIpBlock] = useState(false)
+  useEffect(() => {
+    if (OFFICIAL && isTauri) {
+      invoke('check_ip_allowed')
+        .then(ok => setIpBlock(!ok))
+        .catch(() => setIpBlock(true))
+    }
+  }, [])
 
   const rows = useMemo(() => {
     const m = new Map()
@@ -240,6 +255,22 @@ export default function App() {
 
   return (
     <div className={editing ? 'app editing' : 'app'} onClick={() => setMenu(null)}>
+      {ipBlock && (
+        <div className="ip-block">
+          <button className="ipb-close" title="关闭" onClick={() => appWindow?.close()}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+          <div className="ipb-card">
+            <div className="ipb-eyebrow">Access Restricted</div>
+            <div className="ipb-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>
+            </div>
+            <div className="ipb-title">网络连接失败</div>
+            <div className="ipb-sub">请联系科技管理员</div>
+            <button className="ipb-exit" onClick={() => appWindow?.close()}>退出程序</button>
+          </div>
+        </div>
+      )}
       <div className="titlebar" data-tauri-drag-region onDoubleClick={() => appWindow?.toggleMaximize()}>
         <span className="tb-title" data-tauri-drag-region>SQL 剪切板</span>
         <div className="tb-btns" onDoubleClick={e => e.stopPropagation()}>
@@ -272,6 +303,13 @@ export default function App() {
       <header>
         <h1><em>SQL 剪切板</em></h1>
         <div className="sub">Clipboard</div>
+        {!OFFICIAL && (
+        <div className="tabs">
+          <button className={tab === 'clip' ? 'tab on' : 'tab'} onClick={() => switchTab('clip')}>剪切板</button>
+          <button className={tab === 'query' ? 'tab on' : 'tab'} onClick={() => switchTab('query')}>查询执行</button>
+        </div>
+        )}
+        {tab === 'clip' && (<>
         <div className="f-wrap">
           <input
             className="filter"
@@ -301,8 +339,10 @@ export default function App() {
             </div>
           </div>
         </div>
+        </>)}
       </header>
 
+      {tab === 'clip' && (<>
       <main style={{ zoom: ZOOMS[level] }}>
         {rows.length === 0 && (
           <div className="empty">还没有内容，开启右上角「编辑模式」后可添加行。</div>
@@ -388,6 +428,12 @@ export default function App() {
       {modal && (
         <div className="mask" onMouseDown={e => e.target === e.currentTarget && setModal(null)}>
           <EditBox cell={modal} onSave={saveModal} onDelete={deleteModal} onClose={() => setModal(null)} />
+        </div>
+      )}
+      </>)}
+      {queryMounted && (
+        <div style={{ display: tab === 'query' ? 'contents' : 'none' }}>
+          <QueryPage />
         </div>
       )}
     </div>
