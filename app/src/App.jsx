@@ -57,7 +57,8 @@ export default function App() {
   const cellEls = useRef(new Map())        // 单元格 id -> DOM 元素，用于 FLIP 动画
   const flipFrom = useRef(null)            // 交换前的位置快照（id -> rect）
   const [dragId, setDragId] = useState(null)    // 正在拖拽的单元格 id
-  const [dropId, setDropId] = useState(null)    // 拖拽悬停目标的单元格 id
+  const dragRow = useRef(null)                 // 拖拽开始时所在行
+  const origOrder = useRef(null)               // 拖拽开始时该行 id 顺序（取消拖拽时还原）
   const [query, setQuery] = useState('')
   const [level, setLevel] = useState(() => {
     const v = parseInt(localStorage.getItem('fontLevel'))
@@ -131,6 +132,7 @@ export default function App() {
     cellEls.current.forEach((el, id) => {
       const prev = from.get(id)
       if (!prev) return
+      el.getAnimations().forEach(a => a.cancel())
       const now = el.getBoundingClientRect()
       const dx = (prev.left - now.left) / zoom
       const dy = (prev.top - now.top) / zoom
@@ -143,21 +145,48 @@ export default function App() {
     })
   }, [cells, level])
 
-  // 拖拽移动单元格：仅限同一行内；拖到目标格上则插入到该位置，其余格子顺延
-  const moveCell = async (a, b) => {
-    if (!a || !b || a.id === b.id || a.row !== b.row) return
-    const list = rows.find(([r]) => r === a.row)?.[1] ?? []
-    const rest = list.filter(c => c.id !== a.id)
-    // 向右拖放到目标格之后，向左拖放到目标格之前
-    const bi = rest.findIndex(c => c.id === b.id)
-    const insertAt = a.col < b.col ? bi + 1 : bi
-    const order = [...rest.slice(0, insertAt), a, ...rest.slice(insertAt)]
+  // 按给定 id 顺序应用某行的 col（FLIP 快照 → setCells，动画由 useLayoutEffect 完成）
+  const applyOrder = (row, orderIds) => {
     flipFrom.current = snapshotRects()
     setCells(cs => cs.map(c => {
-      const ni = order.findIndex(o => o.id === c.id)
+      const ni = c.row === row ? orderIds.indexOf(c.id) : -1
       return ni >= 0 ? { ...c, col: ni } : c
     }))
-    if (isTauri) await invoke('reorder_row', { row: a.row, ids: order.map(c => c.id) })
+  }
+
+  // 拖拽悬停：落点是单元格之间的间隙——指针在格子左半则插到它前面，右半则插到它后面。
+  // 不等松手，拖动过程中就实时顺延调整（仅限同一行）。
+  const dragOverCell = (e, cell) => {
+    const src = cells.find(c => c.id === dragId)
+    if (!src || src.row !== cell.row) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (src.id === cell.id) return
+    const list = rows.find(([r]) => r === cell.row)?.[1] ?? []
+    const rest = list.filter(c => c.id !== src.id)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const after = e.clientX > rect.left + rect.width / 2
+    const pos = rest.findIndex(c => c.id === cell.id) + (after ? 1 : 0)
+    const srcIdx = list.findIndex(c => c.id === src.id)
+    if (pos === srcIdx) return // 已在该间隙，无需重排
+    const order = [...rest.slice(0, pos), src, ...rest.slice(pos)]
+    applyOrder(cell.row, order.map(c => c.id))
+  }
+
+  // 拖拽结束：成功放置则持久化新顺序；取消（Esc / 放到无效区域）则还原原顺序
+  const endDrag = e => {
+    const row = dragRow.current
+    if (row !== null) {
+      if (e.dataTransfer.dropEffect === 'none' && origOrder.current) {
+        applyOrder(row, origOrder.current)
+      } else if (isTauri) {
+        const ids = (rows.find(([r]) => r === row)?.[1] ?? []).map(c => c.id)
+        invoke('reorder_row', { row, ids })
+      }
+    }
+    dragRow.current = null
+    origOrder.current = null
+    setDragId(null)
   }
 
   const addCol = async (row, list) => {
@@ -280,7 +309,6 @@ export default function App() {
                 idx === 0 ? 'lead' : '', // 仅第一列文本格显示 § 节号
                 q && cell.display.toLowerCase().includes(q) ? 'hit' : '',
                 cell.id === dragId ? 'dragging' : '',
-                cell.id === dropId && dropId !== dragId ? 'drop-hint' : '',
               ].join(' ').trim()
               return (
                 <div
@@ -289,14 +317,15 @@ export default function App() {
                   title={cell.display}
                   ref={el => (el ? cellEls.current.set(cell.id, el) : cellEls.current.delete(cell.id))}
                   draggable={editing}
-                  onDragStart={e => { setDragId(cell.id); e.dataTransfer.effectAllowed = 'move' }}
-                  onDragEnd={() => { setDragId(null); setDropId(null) }}
-                  onDragOver={editing ? e => {
-                    const src = cells.find(c => c.id === dragId)
-                    if (src && src.row === cell.row) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropId(cell.id) }
-                  } : undefined}
-                  onDragLeave={() => setDropId(d => (d === cell.id ? null : d))}
-                  onDrop={editing ? e => { e.preventDefault(); moveCell(cells.find(c => c.id === dragId), cell); setDragId(null); setDropId(null) } : undefined}
+                  onDragStart={e => {
+                    setDragId(cell.id)
+                    dragRow.current = cell.row
+                    origOrder.current = (rows.find(([r]) => r === cell.row)?.[1] ?? []).map(c => c.id)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDragEnd={endDrag}
+                  onDragOver={editing ? e => dragOverCell(e, cell) : undefined}
+                  onDrop={editing ? e => e.preventDefault() : undefined}
                   onClick={() => clickCell(cell)}
                   onContextMenu={e => openMenu(e, cell)}
                 >

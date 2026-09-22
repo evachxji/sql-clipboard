@@ -116,6 +116,5 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .cell-x{position:absolute;top:2px;right:4px;width:14px;height:14px;font-size:9px;color:var(--mute);
   cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:50%;line-height:1;z-index:2}
 .cell-x:hover{background:#b3261e;color:#fff}
-/* 编辑模式拖拽交换：源格半透明，目标格描边提示 */
-.cell.dragging,.note.dragging{opacity:.4}
-.cell.drop-hint,.note.drop-hint{outline:2px solid var(--acc);outline-offset:2px}
+/* 编辑模式拖拽排序：源格半透明 */
+.cell.dragging,.note.dragging{opacity:.4;pointer-events:none}
