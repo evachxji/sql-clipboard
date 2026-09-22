@@ -240,9 +240,9 @@ export default function App() {
 
   return (
     <div className={editing ? 'app editing' : 'app'} onClick={() => setMenu(null)}>
-      <div className="titlebar" data-tauri-drag-region>
+      <div className="titlebar" data-tauri-drag-region onDoubleClick={() => appWindow?.toggleMaximize()}>
         <span className="tb-title" data-tauri-drag-region>SQL 剪切板</span>
-        <div className="tb-btns">
+        <div className="tb-btns" onDoubleClick={e => e.stopPropagation()}>
           <button
             className={pinned ? 'tb-btn pin on' : 'tb-btn pin'}
             title={pinned ? '取消置顶' : '置顶（窗口不被遮挡）'}
