@@ -175,6 +175,34 @@ fn insert_cell(row: i64, col: i64, display: String, copy: String) -> Result<(), 
     Ok(())
 }
 
+
+/// 交换两个单元格的位置（拖拽排序）
+#[tauri::command]
+fn swap_cells(id_a: i64, id_b: i64) -> Result<(), String> {
+    let conn = open()?;
+    let (ra, ca): (i64, i64) = conn
+        .query_row("SELECT \"row\", col FROM cells WHERE id = ?1", [id_a], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
+        .map_err(|e| e.to_string())?;
+    let (rb, cb): (i64, i64) = conn
+        .query_row("SELECT \"row\", col FROM cells WHERE id = ?1", [id_b], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
+        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE cells SET \"row\" = ?1, col = ?2 WHERE id = ?3",
+        (rb, cb, id_a),
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE cells SET \"row\" = ?1, col = ?2 WHERE id = ?3",
+        (ra, ca, id_b),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 fn update_cell(id: i64, display: String, copy: String) -> Result<(), String> {
     open()?.execute("UPDATE cells SET display = ?1, copy = ?2 WHERE id = ?3", (display, copy, id)).map_err(|e| e.to_string())?;
@@ -537,7 +565,7 @@ fn execute_query(jar: String, url: String, user: String, password: String, sql: 
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            load_cells, add_cell, insert_cell, update_cell, delete_cell, copy_text,
+            load_cells, add_cell, insert_cell, update_cell, delete_cell, swap_cells, copy_text,
             get_java_info, set_java_path, pick_jar,
             save_connection, list_connections, delete_connection,
             list_presets, save_preset, delete_preset, import_presets,
