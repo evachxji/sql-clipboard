@@ -7,7 +7,7 @@ html,body,#root{height:100%}
 body{background:var(--paper);color:var(--ink);overflow:hidden}
 .app{height:100vh;display:flex;flex-direction:column;
   background-image:radial-gradient(rgba(179,84,30,.05) 1px,transparent 1px);background-size:26px 26px}
-/* ????????????????? ??(??)/???/???/?? */
+/* 自定义标题栏：左侧可拖拽，右侧 钉子(置顶)/最小化/最大化/关闭 */
 .titlebar{display:flex;align-items:center;justify-content:space-between;height:34px;flex-shrink:0;
   background:var(--card);border-bottom:1px solid var(--line);user-select:none}
 .tb-title{padding-left:14px;font-size:12px;color:var(--mute);letter-spacing:1px;cursor:default}
@@ -21,7 +21,7 @@ body{background:var(--paper);color:var(--ink);overflow:hidden}
 header{display:flex;align-items:center;gap:16px;padding:14px 28px 12px;border-bottom:1px solid var(--line);background:var(--card)}
 h1{font-family:'Fraunces','Microsoft YaHei',serif;font-size:22px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
 h1 em{font-style:italic;color:var(--acc)}
-.sub{font-size:12px;color:var(--mute);letter-spacing:2px;text-transform:uppercase;white-space:nowrap}
+.sub{font-family:'Fraunces','Microsoft YaHei',serif;font-style:italic;font-weight:500;font-size:13px;color:var(--mute);letter-spacing:1px;white-space:nowrap}
 .f-wrap{position:relative;margin-left:auto;flex-shrink:0}
 .filter{width:180px;padding:7px 28px 7px 14px;border:1.5px solid var(--line);border-radius:30px;
   background:var(--paper);color:var(--ink);font-size:12.5px;font-family:inherit;outline:none;transition:.15s}
