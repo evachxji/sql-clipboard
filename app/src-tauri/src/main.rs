@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use rusqlite::{Connection, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -189,32 +189,19 @@ fn insert_cell(row: i64, col: i64, display: String, copy: String) -> Result<(), 
     Ok(())
 }
 
-
-/// 交换两个单元格的位置（拖拽排序）
+/// 行内拖拽排序：按 ids 顺序重排该行的 col（前端保证 ids 覆盖该行全部单元格）
 #[tauri::command]
-fn swap_cells(id_a: i64, id_b: i64) -> Result<(), String> {
-    let conn = open()?;
-    let (ra, ca): (i64, i64) = conn
-        .query_row("SELECT \"row\", col FROM cells WHERE id = ?1", [id_a], |r| {
-            Ok((r.get(0)?, r.get(1)?))
-        })
+fn reorder_row(row: i64, ids: Vec<i64>) -> Result<(), String> {
+    let mut conn = open()?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    for (i, id) in ids.iter().enumerate() {
+        tx.execute(
+            "UPDATE cells SET col = ?1 WHERE id = ?2 AND \"row\" = ?3",
+            (i as i64, id, row),
+        )
         .map_err(|e| e.to_string())?;
-    let (rb, cb): (i64, i64) = conn
-        .query_row("SELECT \"row\", col FROM cells WHERE id = ?1", [id_b], |r| {
-            Ok((r.get(0)?, r.get(1)?))
-        })
-        .map_err(|e| e.to_string())?;
-    conn.execute(
-        "UPDATE cells SET \"row\" = ?1, col = ?2 WHERE id = ?3",
-        (rb, cb, id_a),
-    )
-    .map_err(|e| e.to_string())?;
-    conn.execute(
-        "UPDATE cells SET \"row\" = ?1, col = ?2 WHERE id = ?3",
-        (ra, ca, id_b),
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(())
+    }
+    tx.commit().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -534,19 +521,40 @@ fn delete_preset(id: i64) -> Result<(), String> {
     Ok(())
 }
 
-/// 导入预设：JSON 文件，格式 [{"name":"...","sql":"..."}]，返回导入条数
+/// 预设导入条目（前端回传勾选结果）
+#[derive(Deserialize)]
+struct PresetIn {
+    name: String,
+    sql: String,
+    remarks: String,
+}
+
+/// 预设文件条目：dup 表示与库内已有查询重名（导入时跳过）
+#[derive(Serialize)]
+struct PresetFileItem {
+    name: String,
+    sql: String,
+    remarks: String,
+    dup: bool,
+}
+
+fn preset_exists(conn: &Connection, name: &str) -> bool {
+    conn.query_row("SELECT 1 FROM presets WHERE name = ?1", [name], |_| Ok(())).is_ok()
+}
+
+/// 读取预设文件：JSON 格式 [{"name":"...","sql":"..."}]，返回条目供前端勾选
 #[tauri::command]
-fn import_presets() -> Result<i64, String> {
+fn read_presets_file() -> Result<Vec<PresetFileItem>, String> {
     let Some(f) = rfd::FileDialog::new().add_filter("预设 SQL", &["json"]).pick_file() else {
-        return Ok(0);
+        return Ok(Vec::new());
     };
     let text = std::fs::read_to_string(&f).map_err(|e| e.to_string())?;
     let arr: Vec<Value> = serde_json::from_str(&text).map_err(|e| format!("JSON 解析失败: {e}"))?;
     let conn = open()?;
-    let mut count = 0i64;
+    let mut out: Vec<PresetFileItem> = Vec::new();
     for item in &arr {
-        let name = item["name"].as_str().unwrap_or_default().trim();
-        let sql = item["sql"].as_str().unwrap_or_default().trim();
+        let name = item["name"].as_str().unwrap_or_default().trim().to_string();
+        let sql = item["sql"].as_str().unwrap_or_default().trim().to_string();
         if name.is_empty() || sql.is_empty() {
             continue;
         }
@@ -556,10 +564,63 @@ fn import_presets() -> Result<i64, String> {
             Value::String(t) => t.clone(),
             _ => String::new(),
         };
-        conn.execute("INSERT INTO presets (name, sql, remarks) VALUES (?1, ?2, ?3)", (name, sql, remarks)).map_err(|e| e.to_string())?;
+        // 与库内重名、或文件内同名条目已出现过，均标记跳过
+        let dup = preset_exists(&conn, &name) || out.iter().any(|p| p.name == name);
+        out.push(PresetFileItem { name, sql, remarks, dup });
+    }
+    Ok(out)
+}
+
+/// 导入勾选的预设：名称已存在则跳过，返回实际导入条数
+#[tauri::command]
+fn import_presets(items: Vec<PresetIn>) -> Result<i64, String> {
+    let conn = open()?;
+    let mut count = 0i64;
+    for it in &items {
+        let name = it.name.trim();
+        let sql = it.sql.trim();
+        if name.is_empty() || sql.is_empty() || preset_exists(&conn, name) {
+            continue;
+        }
+        conn.execute("INSERT INTO presets (name, sql, remarks) VALUES (?1, ?2, ?3)", (name, sql, &it.remarks)).map_err(|e| e.to_string())?;
         count += 1;
     }
     Ok(count)
+}
+
+/// 导出勾选的预设：JSON 文件 [{"name","sql","remarks"}]，返回导出条数（取消为 0）
+#[tauri::command]
+fn export_presets(ids: Vec<i64>) -> Result<i64, String> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let Some(f) = rfd::FileDialog::new()
+        .add_filter("预设 SQL", &["json"])
+        .set_file_name("presets.json")
+        .save_file()
+    else {
+        return Ok(0);
+    };
+    let conn = open()?;
+    let mut arr = Vec::new();
+    for id in &ids {
+        let row = conn
+            .query_row("SELECT name, sql, remarks FROM presets WHERE id = ?1", [id], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
+            })
+            .ok();
+        if let Some((name, sql, remarks)) = row {
+            // remarks 库内为 JSON 字符串，导出时还原为对象便于阅读
+            let mut o = json!({ "name": name, "sql": sql });
+            if !remarks.trim().is_empty() {
+                o["remarks"] = serde_json::from_str::<Value>(&remarks).unwrap_or(Value::String(remarks));
+            }
+            arr.push(o);
+        }
+    }
+    let text = serde_json::to_string_pretty(&arr).map_err(|e| e.to_string())?;
+    std::fs::write(&f, text).map_err(|e| e.to_string())?;
+    Ok(arr.len() as i64)
 }
 
 /// async 命令：JVM 启动 + 建连耗时数秒，放到阻塞线程池，避免卡住界面
@@ -625,10 +686,10 @@ fn execute_query_blocking(jar: String, url: String, user: String, password: Stri
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            load_cells, add_cell, insert_cell, update_cell, delete_cell, swap_cells, copy_text,
+            load_cells, add_cell, insert_cell, update_cell, delete_cell, reorder_row, copy_text,
             get_java_info, set_java_path, pick_jar,
             save_connection, list_connections, delete_connection,
-            list_presets, save_preset, delete_preset, import_presets,
+            list_presets, save_preset, delete_preset, read_presets_file, import_presets, export_presets,
             test_connection, execute_query
         ])
         .run(tauri::generate_context!())

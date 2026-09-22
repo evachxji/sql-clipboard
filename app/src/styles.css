@@ -258,4 +258,7 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .cell-x:hover{background:#b3261e;color:#fff}
 /* 编辑模式拖拽交换：源格半透明，目标格描边提示 */
 .cell.dragging,.note.dragging{opacity:.4}
-.cell.drop-hint,.note.drop-hint{outline:2px solid var(--acc);outline-offset:2px}
+.cell.drop-hint,.note.drop-hint{outline:2px solid var(--acc);outline-offset:2px}
+/* 拖拽落点指示线：目标格左/右边缘的竖线 */
+.cell.drop-l,.note.drop-l{box-shadow:inset 3px 0 0 var(--acc)}
+.cell.drop-r,.note.drop-r{box-shadow:inset -3px 0 0 var(--acc)}

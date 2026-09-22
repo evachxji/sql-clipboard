@@ -61,7 +61,10 @@ export default function App() {
   const cellEls = useRef(new Map())        // 单元格 id -> DOM 元素，用于 FLIP 动画
   const flipFrom = useRef(null)            // 交换前的位置快照（id -> rect）
   const [dragId, setDragId] = useState(null)    // 正在拖拽的单元格 id
-  const [dropId, setDropId] = useState(null)    // 拖拽悬停目标的单元格 id
+  const [hintId, setHintId] = useState(null)      // 落点指示线所在单元格
+  const [hintAfter, setHintAfter] = useState(false) // 指示线在该格右侧还是左侧
+  const dragRow = useRef(null)                 // 拖拽开始时所在行
+  const origOrder = useRef(null)               // 拖拽开始时该行 id 顺序（取消拖拽时还原）
   const [query, setQuery] = useState('')
   const [level, setLevel] = useState(() => {
     const v = parseInt(localStorage.getItem('fontLevel'))
@@ -120,7 +123,7 @@ export default function App() {
     else setCells(cs => cs.filter(c => c.id !== cell.id))
   }
 
-  // 拖拽交换两个单元格的位置（行/列互换），并用 FLIP 动画平滑过渡
+  // 拖拽移动与 FLIP 平滑动画
   const snapshotRects = () => {
     const m = new Map()
     cellEls.current.forEach((el, id) => m.set(id, el.getBoundingClientRect()))
@@ -135,6 +138,7 @@ export default function App() {
     cellEls.current.forEach((el, id) => {
       const prev = from.get(id)
       if (!prev) return
+      el.getAnimations().forEach(a => a.cancel())
       const now = el.getBoundingClientRect()
       const dx = (prev.left - now.left) / zoom
       const dy = (prev.top - now.top) / zoom
@@ -147,14 +151,56 @@ export default function App() {
     })
   }, [cells, level])
 
-  const swapCells = async (a, b) => {
-    if (!a || !b || a.id === b.id) return
+  // 按给定 id 顺序应用某行的 col（FLIP 快照 → setCells，动画由 useLayoutEffect 完成）
+  const applyOrder = (row, orderIds) => {
     flipFrom.current = snapshotRects()
-    setCells(cs => cs.map(c =>
-      c.id === a.id ? { ...c, row: b.row, col: b.col } :
-      c.id === b.id ? { ...c, row: a.row, col: a.col } : c
-    ))
-    if (isTauri) await invoke('swap_cells', { idA: a.id, idB: b.id })
+    setCells(cs => cs.map(c => {
+      const ni = c.row === row ? orderIds.indexOf(c.id) : -1
+      return ni >= 0 ? { ...c, col: ni } : c
+    }))
+  }
+
+  // 拖拽悬停：落点是单元格之间的间隙——指针在格子左半则插到它前面，右半则插到它后面，
+  // 并在该间隙处显示指示线。
+  // 不等松手，拖动过程中就实时顺延调整（仅限同一行）。
+  const dragOverCell = (e, cell) => {
+    const src = cells.find(c => c.id === dragId)
+    if (!src || src.row !== cell.row) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (src.id === cell.id) return
+    const list = rows.find(([r]) => r === cell.row)?.[1] ?? []
+    const rest = list.filter(c => c.id !== src.id)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const after = e.clientX > rect.left + rect.width / 2
+    const pos = rest.findIndex(c => c.id === cell.id) + (after ? 1 : 0)
+    setHintId(cell.id)
+    setHintAfter(after)
+    const srcIdx = list.findIndex(c => c.id === src.id)
+    if (pos === srcIdx) return // 已在该间隙，无需重排
+    const order = [...rest.slice(0, pos), src, ...rest.slice(pos)]
+    applyOrder(cell.row, order.map(c => c.id))
+  }
+
+  // 拖拽结束：成功放置则持久化新顺序；取消（Esc / 放到无效区域）则还原原顺序
+  const endDrag = e => {
+    const row = dragRow.current
+    if (row !== null) {
+      // 实时顺延后被拖的格子可能正悬在指针下，此时 Chrome 不派发有效 drop，
+      // 所以用指针位置兜底：松手时指针在源行内即算放置成功
+      const el = document.elementFromPoint(e.clientX, e.clientY)
+      const dropped = e.dataTransfer.dropEffect !== 'none' || el?.closest('.row')?.dataset.row === String(row)
+      if (!dropped && origOrder.current) {
+        applyOrder(row, origOrder.current)
+      } else if (isTauri) {
+        const ids = (rows.find(([r]) => r === row)?.[1] ?? []).map(c => c.id)
+        invoke('reorder_row', { row, ids })
+      }
+    }
+    dragRow.current = null
+    origOrder.current = null
+    setDragId(null)
+    setHintId(null)
   }
 
   const addCol = async (row, list) => {
@@ -277,14 +323,14 @@ export default function App() {
         )}
         <div className="grid">
         {visibleRows.map(([r, list]) => (
-          <div className="row" key={r}>
+          <div className="row" key={r} data-row={r}>
             {list.map((cell, idx) => {
               const cls = [
                 hasCopy(cell) ? 'cell' : 'note',
                 idx === 0 ? 'lead' : '', // 仅第一列文本格显示 § 节号
                 q && cell.display.toLowerCase().includes(q) ? 'hit' : '',
                 cell.id === dragId ? 'dragging' : '',
-                cell.id === dropId && dropId !== dragId ? 'drop-hint' : '',
+                cell.id === hintId && hintId !== dragId ? (hintAfter ? 'drop-r' : 'drop-l') : '',
               ].join(' ').trim()
               return (
                 <div
@@ -293,11 +339,15 @@ export default function App() {
                   title={cell.display}
                   ref={el => (el ? cellEls.current.set(cell.id, el) : cellEls.current.delete(cell.id))}
                   draggable={editing}
-                  onDragStart={e => { setDragId(cell.id); e.dataTransfer.effectAllowed = 'move' }}
-                  onDragEnd={() => { setDragId(null); setDropId(null) }}
-                  onDragOver={editing ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropId(cell.id) } : undefined}
-                  onDragLeave={() => setDropId(d => (d === cell.id ? null : d))}
-                  onDrop={editing ? e => { e.preventDefault(); swapCells(cells.find(c => c.id === dragId), cell); setDragId(null); setDropId(null) } : undefined}
+                  onDragStart={e => {
+                    setDragId(cell.id)
+                    dragRow.current = cell.row
+                    origOrder.current = (rows.find(([r]) => r === cell.row)?.[1] ?? []).map(c => c.id)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDragEnd={endDrag}
+                  onDragOver={editing ? e => dragOverCell(e, cell) : undefined}
+                  onDrop={editing ? e => e.preventDefault() : undefined}
                   onClick={() => clickCell(cell)}
                   onContextMenu={e => openMenu(e, cell)}
                 >
