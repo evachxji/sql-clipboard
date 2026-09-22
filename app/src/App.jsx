@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
+const appWindow = isTauri ? getCurrentWindow() : null
 
 // 浏览器预览时使用的示例数据（打包后在 Tauri 中走 SQLite）
 const MOCK = [
@@ -47,6 +49,7 @@ function injectVars(text) {
 
 export default function App() {
   const [cells, setCells] = useState([])
+  const [pinned, setPinned] = useState(false) // ??????????
   const [editing, setEditing] = useState(false)
   const [toasts, setToasts] = useState([])
   const [modal, setModal] = useState(null) // {id, display, copy}
@@ -191,9 +194,38 @@ export default function App() {
 
   return (
     <div className={editing ? 'app editing' : 'app'} onClick={() => setMenu(null)}>
+      <div className="titlebar" data-tauri-drag-region>
+        <span className="tb-title" data-tauri-drag-region>SQL ???</span>
+        <div className="tb-btns">
+          <button
+            className={pinned ? 'tb-btn pin on' : 'tb-btn pin'}
+            title={pinned ? '????' : '??????????'}
+            onClick={async () => {
+              if (!appWindow) return
+              const next = !pinned
+              await appWindow.setAlwaysOnTop(next)
+              setPinned(next)
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 17v5" />
+              <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z" />
+            </svg>
+          </button>
+          <button className="tb-btn" title="???" onClick={() => appWindow?.minimize()}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 12h14" /></svg>
+          </button>
+          <button className="tb-btn" title="??? / ??" onClick={() => appWindow?.toggleMaximize()}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="6" y="6" width="12" height="12" rx="1.5" /></svg>
+          </button>
+          <button className="tb-btn close" title="??" onClick={() => appWindow?.close()}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+      </div>
       <header>
-        <h1>SQL <em>剪切板</em></h1>
-        <div className="sub">Query Ledger · 账簿</div>
+        <h1><em>SQL 剪切板</em></h1>
+        <div className="sub">Clipboard</div>
         <div className="f-wrap">
           <input
             className="filter"
