@@ -54,6 +54,8 @@ export default function App() {
   const [editing, setEditing] = useState(false)
   const [toasts, setToasts] = useState([])
   const [tab, setTab] = useState('clip')
+  const [queryMounted, setQueryMounted] = useState(false) // 首次进入后保持挂载，避免来回切换重新建连
+  const switchTab = t => { setTab(t); if (t === 'query') setQueryMounted(true) }
   const [modal, setModal] = useState(null) // {id, display, copy}
   const [menu, setMenu] = useState(null)   // {x, y, cell}
   const cellEls = useRef(new Map())        // 单元格 id -> DOM 元素，用于 FLIP 动画
@@ -229,8 +231,8 @@ export default function App() {
         <h1><em>SQL 剪切板</em></h1>
         <div className="sub">Clipboard</div>
         <div className="tabs">
-          <button className={tab === 'clip' ? 'tab on' : 'tab'} onClick={() => setTab('clip')}>剪切板</button>
-          <button className={tab === 'query' ? 'tab on' : 'tab'} onClick={() => setTab('query')}>查询执行</button>
+          <button className={tab === 'clip' ? 'tab on' : 'tab'} onClick={() => switchTab('clip')}>剪切板</button>
+          <button className={tab === 'query' ? 'tab on' : 'tab'} onClick={() => switchTab('query')}>查询执行</button>
         </div>
         {tab === 'clip' && (<>
         <div className="f-wrap">
@@ -350,7 +352,11 @@ export default function App() {
         </div>
       )}
       </>)}
-      {tab === 'query' && <QueryPage />}
+      {queryMounted && (
+        <div style={{ display: tab === 'query' ? 'contents' : 'none' }}>
+          <QueryPage />
+        </div>
+      )}
     </div>
   )
 }

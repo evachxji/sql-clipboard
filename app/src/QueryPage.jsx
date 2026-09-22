@@ -115,6 +115,8 @@ export default function QueryPage() {
   const [showEditor, setShowEditor] = useState(false)
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState(null) // {…execute_query 返回, label, sqlText}
+  const [menu, setMenu] = useState(null)   // 右键菜单 {x, y, items:[{label,danger,action}]}
+  const [confirm, setConfirm] = useState(null) // 删除二次确认 {text, action}
 
   const loadConns = useCallback(async () => {
     try {
@@ -195,6 +197,13 @@ export default function QueryPage() {
     setRunning(false)
   }
 
+  const openMenu = (e, items) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({ x: e.clientX, y: e.clientY, items })
+  }
+  const askDelete = (text, action) => setConfirm({ text, action })
+
   const clickPreset = (p) => {
     if (!selConn) { setResult({ error: '请先在左侧选择或新建一个连接' }); return }
     setResult(null)
@@ -207,14 +216,21 @@ export default function QueryPage() {
   }
 
   return (
-    <div className="qwrap">
+    <div className="qwrap" onClick={() => setMenu(null)}>
       <aside className="qside">
         <button className="qnew" onClick={() => setConnModal({ name: '', jar: '', url: '', user: '', password: '' })}>＋ 新建连接</button>
         {conns.length === 0 && <div className="qside-empty">还没有连接配置</div>}
         {conns.map(c => {
           const st = connStatus[c.id]
           return (
-            <div key={c.id} className={sel === c.id ? 'conn-card on' : 'conn-card'} onClick={() => setSel(c.id)}>
+            <div
+              key={c.id}
+              className={sel === c.id ? 'conn-card on' : 'conn-card'}
+              onClick={() => setSel(c.id)}
+              onContextMenu={e => openMenu(e, [
+                { label: '删除', danger: true, action: () => askDelete(`确认删除连接「${c.name}」？删除后不可恢复。`, () => delConn(c)) },
+              ])}
+            >
               <div className="cc-name">{c.name}</div>
               <div className="cc-url" title={c.url}>{c.url}</div>
               <div className="cc-jar" title={c.jar}>{base(c.jar)}</div>
@@ -227,9 +243,7 @@ export default function QueryPage() {
                 </div>
               )}
               <div className="cc-btns" onClick={e => e.stopPropagation()}>
-                <button onClick={() => testConn(c)}>重连</button>
                 <button onClick={() => setConnModal({ ...c })}>编辑</button>
-                <button className="danger" onClick={() => delConn(c)}>删除</button>
               </div>
             </div>
           )
@@ -253,16 +267,22 @@ export default function QueryPage() {
             const vars = extractVars(p.sql)
             const rem = parseRemarks(p.remarks)
             return (
-              <div key={p.id} className="pcell" style={{ animationDelay: `${idx * 40}ms` }} title={p.sql} onClick={() => clickPreset(p)}>
+              <div
+                key={p.id}
+                className="pcell"
+                style={{ animationDelay: `${idx * 40}ms` }}
+                title={p.sql}
+                onClick={() => clickPreset(p)}
+                onContextMenu={e => openMenu(e, [
+                  { label: '编辑', action: () => setPresetModal({ ...p }) },
+                  { label: '删除', danger: true, action: () => askDelete(`确认删除预设查询「${p.name}」？删除后不可恢复。`, () => delPreset(p)) },
+                ])}
+              >
                 <div className="pcell-name">{p.name}</div>
                 <div className="pcell-vars">
                   {vars.length
                     ? vars.map(n => <code key={n}>{rem[n] || n}</code>)
                     : <span className="pcell-direct">直接执行</span>}
-                </div>
-                <div className="pcell-ops" onClick={e => e.stopPropagation()}>
-                  <i title="编辑" onClick={() => setPresetModal({ ...p })}>✎</i>
-                  <i title="删除" onClick={() => delPreset(p)}>✕</i>
                 </div>
               </div>
             )
@@ -361,6 +381,41 @@ export default function QueryPage() {
               await runNow(p.sql, paramValues, p.name)
             }}
           />
+        </div>
+      )}
+      {menu && (
+        <div
+          className="ctx"
+          style={{
+            // 靠近窗口右/下边缘时翻转，避免菜单显示不全
+            left: Math.min(menu.x, window.innerWidth - 150),
+            top: menu.y + menu.items.length * 34 + 20 > window.innerHeight
+              ? Math.max(8, menu.y - menu.items.length * 34 - 12)
+              : menu.y,
+          }}
+          onClick={e => e.stopPropagation()}
+          onContextMenu={e => e.preventDefault()}
+        >
+          {menu.items.map((it, i) => (
+            <button key={i} className={it.danger ? 'danger' : ''} onClick={async () => { setMenu(null); await it.action() }}>
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {confirm && (
+        <div className="mask" onMouseDown={e => e.target === e.currentTarget && setConfirm(null)}>
+          <div className="box">
+            <h3>确认删除</h3>
+            <div className="confirm-text">{confirm.text}</div>
+            <div className="actions">
+              <span />
+              <span>
+                <button className="btn" onClick={() => setConfirm(null)}>取消</button>
+                <button className="btn del" onClick={async () => { setConfirm(null); await confirm.action() }}>删除</button>
+              </span>
+            </div>
+          </div>
         </div>
       )}
     </div>
