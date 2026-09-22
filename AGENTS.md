@@ -13,13 +13,13 @@
 
 ## Build, Test, and Development Commands
 
-```bash
+``bash
 cd app
 npm install          # 安装依赖
 npm run tauri dev    # 开发调试（热更新）
 npm run tauri build  # 构建便携单文件 exe
 npm run dev          # 仅前端 Vite（浏览器预览，走 MOCK 数据）
-```
+``
 
 构建产物：`app/src-tauri/target/release/sql-clipboard.exe`。
 
@@ -46,3 +46,9 @@ npm run dev          # 仅前端 Vite（浏览器预览，走 MOCK 数据）
 
 - `app/src-tauri/tauri.conf.json` 控制窗口与打包配置；capabilities 文件管理权限白名单
 - 勿在代码中硬编码数据库连接凭据；JDBC 连接配置由用户在界面录入并落库
+
+
+## 打包约定
+
+- 打包便携版 exe 后，把成品复制到仓库根目录的 `便携版\` 目录下，方便直接取用：
+  `app\src-tauri\target\release\sql-clipboard.exe` → `便携版\sql-clipboard.exe`
