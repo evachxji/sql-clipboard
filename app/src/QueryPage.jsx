@@ -280,6 +280,7 @@ export default function QueryPage() {
               className={sel === c.id ? 'conn-card on' : 'conn-card'}
               onClick={() => setSel(c.id)}
               onContextMenu={e => openMenu(e, [
+                { label: '编辑', action: () => setConnModal({ ...c }) },
                 { label: '删除', danger: true, action: () => askDelete(`确认删除连接「${c.name}」？删除后不可恢复。`, () => delConn(c)) },
               ])}
             >
@@ -294,9 +295,6 @@ export default function QueryPage() {
                   {st.msg}
                 </div>
               )}
-              <div className="cc-btns" onClick={e => e.stopPropagation()}>
-                <button onClick={() => setConnModal({ ...c })}>编辑</button>
-              </div>
             </div>
           )
         })}

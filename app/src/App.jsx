@@ -255,7 +255,22 @@ export default function App() {
 
   return (
     <div className={editing ? 'app editing' : 'app'} onClick={() => setMenu(null)}>
-      {ipBlock && <div className="ip-block">网络连接失败，请联系科技管理员</div>}
+      {ipBlock && (
+        <div className="ip-block">
+          <button className="ipb-close" title="关闭" onClick={() => appWindow?.close()}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+          <div className="ipb-card">
+            <div className="ipb-eyebrow">Access Restricted</div>
+            <div className="ipb-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>
+            </div>
+            <div className="ipb-title">网络连接失败</div>
+            <div className="ipb-sub">请联系科技管理员</div>
+            <button className="ipb-exit" onClick={() => appWindow?.close()}>退出程序</button>
+          </div>
+        </div>
+      )}
       <div className="titlebar" data-tauri-drag-region onDoubleClick={() => appWindow?.toggleMaximize()}>
         <span className="tb-title" data-tauri-drag-region>SQL 剪切板</span>
         <div className="tb-btns" onDoubleClick={e => e.stopPropagation()}>
