@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:bridge": "javac -encoding UTF-8 -d src-tauri\\bridge\\classes bridge\\JdbcBridge.java && jar --create --file src-tauri\\bridge\\jdbc-bridge.jar -C src-tauri\\bridge\\classes .",
+    "build:bridge": "javac -encoding UTF-8 --release 8 -d src-tauri\\bridge\\classes bridge\\JdbcBridge.java && jar --create --file src-tauri\\bridge\\jdbc-bridge.jar -C src-tauri\\bridge\\classes .",
     "build": "npm run build:bridge && vite build",
     "tauri": "tauri"
   },

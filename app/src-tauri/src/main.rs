@@ -3,9 +3,9 @@
 use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
@@ -350,6 +350,7 @@ struct Bridge {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
+    stderr: BufReader<ChildStderr>,
 }
 
 fn ensure_bridge_jar() -> Result<PathBuf, String> {
@@ -372,7 +373,7 @@ fn start_bridge() -> Result<Bridge, String> {
     cmd.arg("-cp").arg(jar).arg("JdbcBridge")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+        .stderr(Stdio::piped()); // 捕获错误输出，进程退出时带出死因
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -381,7 +382,8 @@ fn start_bridge() -> Result<Bridge, String> {
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
     let stdin = child.stdin.take().ok_or("无法打开桥接进程 stdin")?;
     let stdout = BufReader::new(child.stdout.take().ok_or("无法打开桥接进程 stdout")?);
-    Ok(Bridge { child, stdin, stdout })
+    let stderr = BufReader::new(child.stderr.take().ok_or("无法打开桥接进程 stdout")?);
+    Ok(Bridge { child, stdin, stdout, stderr })
 }
 
 fn call_once(bridge: &mut Bridge, req: &Value) -> Result<Value, String> {
@@ -392,7 +394,16 @@ fn call_once(bridge: &mut Bridge, req: &Value) -> Result<Value, String> {
     let mut resp = String::new();
     bridge.stdout.read_line(&mut resp).map_err(|e| e.to_string())?;
     if resp.is_empty() {
-        return Err("桥接进程已退出".into());
+        // 进程已退出：等待结束并读取 stderr，把真实死因（如 Java 版本过低）带给用户
+        let _ = bridge.child.wait();
+        let mut err_out = String::new();
+        let _ = bridge.stderr.read_to_string(&mut err_out);
+        let detail = err_out.trim();
+        return Err(if detail.is_empty() {
+            "桥接进程已退出".into()
+        } else {
+            format!("{}\n{}", "桥接进程已退出", detail)
+        });
     }
     serde_json::from_str(&resp).map_err(|e| format!("桥接响应解析失败: {e}"))
 }
