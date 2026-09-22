@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
 const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
@@ -51,6 +51,10 @@ export default function App() {
   const [toasts, setToasts] = useState([])
   const [modal, setModal] = useState(null) // {id, display, copy}
   const [menu, setMenu] = useState(null)   // {x, y, cell}
+  const cellEls = useRef(new Map())        // 单元格 id -> DOM 元素，用于 FLIP 动画
+  const flipFrom = useRef(null)            // 交换前的位置快照（id -> rect）
+  const [dragId, setDragId] = useState(null)    // 正在拖拽的单元格 id
+  const [dropId, setDropId] = useState(null)    // 拖拽悬停目标的单元格 id
   const [query, setQuery] = useState('')
   const [level, setLevel] = useState(() => {
     const v = parseInt(localStorage.getItem('fontLevel'))
@@ -107,6 +111,43 @@ export default function App() {
     setMenu(null)
     if (isTauri) { await invoke('delete_cell', { id: cell.id }); await load() }
     else setCells(cs => cs.filter(c => c.id !== cell.id))
+  }
+
+  // 拖拽交换两个单元格的位置（行/列互换），并用 FLIP 动画平滑过渡
+  const snapshotRects = () => {
+    const m = new Map()
+    cellEls.current.forEach((el, id) => m.set(id, el.getBoundingClientRect()))
+    return m
+  }
+  // cells 变化后：对比快照，位移过的单元格从旧位置动画滑到新位置
+  useLayoutEffect(() => {
+    if (!flipFrom.current) return
+    const from = flipFrom.current
+    flipFrom.current = null
+    const zoom = ZOOMS[level] // getBoundingClientRect 是缩放后的视觉坐标，需除回
+    cellEls.current.forEach((el, id) => {
+      const prev = from.get(id)
+      if (!prev) return
+      const now = el.getBoundingClientRect()
+      const dx = (prev.left - now.left) / zoom
+      const dy = (prev.top - now.top) / zoom
+      if (dx || dy) {
+        el.animate(
+          [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+          { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)' },
+        )
+      }
+    })
+  }, [cells, level])
+
+  const swapCells = async (a, b) => {
+    if (!a || !b || a.id === b.id) return
+    flipFrom.current = snapshotRects()
+    setCells(cs => cs.map(c =>
+      c.id === a.id ? { ...c, row: b.row, col: b.col } :
+      c.id === b.id ? { ...c, row: a.row, col: a.col } : c
+    ))
+    if (isTauri) await invoke('swap_cells', { idA: a.id, idB: b.id })
   }
 
   const addCol = async (row, list) => {
@@ -199,12 +240,21 @@ export default function App() {
                 hasCopy(cell) ? 'cell' : 'note',
                 idx === 0 ? 'lead' : '', // 仅第一列文本格显示 § 节号
                 q && cell.display.toLowerCase().includes(q) ? 'hit' : '',
+                cell.id === dragId ? 'dragging' : '',
+                cell.id === dropId && dropId !== dragId ? 'drop-hint' : '',
               ].join(' ').trim()
               return (
                 <div
                   className={cls}
                   key={cell.id}
                   title={cell.display}
+                  ref={el => (el ? cellEls.current.set(cell.id, el) : cellEls.current.delete(cell.id))}
+                  draggable={editing}
+                  onDragStart={e => { setDragId(cell.id); e.dataTransfer.effectAllowed = 'move' }}
+                  onDragEnd={() => { setDragId(null); setDropId(null) }}
+                  onDragOver={editing ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropId(cell.id) } : undefined}
+                  onDragLeave={() => setDropId(d => (d === cell.id ? null : d))}
+                  onDrop={editing ? e => { e.preventDefault(); swapCells(cells.find(c => c.id === dragId), cell); setDragId(null); setDropId(null) } : undefined}
                   onClick={() => clickCell(cell)}
                   onContextMenu={e => openMenu(e, cell)}
                 >
@@ -244,8 +294,10 @@ export default function App() {
           onContextMenu={e => e.preventDefault()}
         >
           <button onClick={() => { setModal({ ...menu.cell }); setMenu(null) }}>编辑</button>
-          <button onClick={() => genSelect(menu.cell, false)}>生成select</button>
-          <button onClick={() => genSelect(menu.cell, true)}>生成select（昨天）</button>
+          {!hasCopy(menu.cell) && (<>
+            <button onClick={() => genSelect(menu.cell, false)}>生成select</button>
+            <button onClick={() => genSelect(menu.cell, true)}>生成select（昨天）</button>
+          </>)}
           <button onClick={() => insertRight(menu.cell, menu.cell.display, menu.cell.copy)}>复制</button>
           <button className="danger" onClick={() => deleteCell(menu.cell)}>删除</button>
         </div>
