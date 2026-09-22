@@ -50,5 +50,15 @@ npm run dev          # 仅前端 Vite（浏览器预览，走 MOCK 数据）
 
 ## 打包约定
 
-- 打包便携版 exe 后，把成品复制到仓库根目录的 `便携版\` 目录下，方便直接取用：
-  `app\src-tauri\target\release\sql-clipboard.exe` → `便携版\sql-clipboard.exe`
+打包便携版 exe 时固定打 2 个版本，成品都复制到仓库根目录的 `便携版\` 目录下：
+
+1. **标准版**（功能完整，含「剪切板 / 查询执行」tab 栏与连接侧栏）：
+   `cd app; npm run tauri build`
+   产物 `app\src-tauri\target\release\sql-clipboard.exe` → `便携版\sql-clipboard.exe`
+2. **正式版**（去掉顶部 tab 栏，默认进入查询执行页；隐藏左侧连接栏（功能保留）；自动加载第一个连接配置）：
+   `cd app; npm run build:official`（等价于设置 `VITE_EDITION=official` 后 `npm run tauri build`）
+   同名产物 → `便携版\sql-clipboard-正式版.exe`
+
+- 正式版差异由 `app/src/edition.js` 的 `OFFICIAL` 常量控制（Vite 构建期内联），Rust 端通过 `option_env!("VITE_EDITION")` 识别版本
+- 正式版带 IP 白名单：仓库根目录 `.env` 的 `IP_WHITELIST`（逗号分隔 IPv4）由 `build.rs` 编译期注入；为空 = 不限制，配置后非白名单机器启动即拦截；改白名单需重打正式版
+- 两个 exe 放在同一目录（`便携版\`），运行时共用该目录下的 `sql_clipboard.db`

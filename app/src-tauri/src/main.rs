@@ -634,6 +634,24 @@ fn export_presets(ids: Vec<i64>) -> Result<i64, String> {
     Ok(arr.len() as i64)
 }
 
+/// 正式版 IP 白名单校验（编译期从仓库根目录 .env 注入）：白名单为空则不限制
+#[tauri::command]
+fn check_ip_allowed() -> bool {
+    if option_env!("VITE_EDITION") != Some("official") {
+        return true; // 标准版不限制
+    }
+    let wl = option_env!("IP_WHITELIST").unwrap_or_default();
+    let list: Vec<&str> = wl.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+    if list.is_empty() {
+        return true;
+    }
+    let Ok(ifas) = local_ip_address::list_afinet_netifas() else {
+        return false; // 枚举网卡失败按拦截处理
+    };
+    // 任一本机 IPv4 命中白名单即放行
+    ifas.iter().any(|(_, ip)| matches!(ip, std::net::IpAddr::V4(v4) if list.iter().any(|a| *a == v4.to_string())))
+}
+
 /// async 命令：JVM 启动 + 建连耗时数秒，放到阻塞线程池，避免卡住界面
 #[tauri::command]
 async fn test_connection(jar: String, url: String, user: String, password: String) -> TestResult {
@@ -699,7 +717,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             load_cells, add_cell, insert_cell, update_cell, delete_cell, reorder_row, copy_text,
             get_java_info, set_java_path, pick_jar,
-            save_connection, list_connections, delete_connection,
+            save_connection, list_connections, delete_connection, check_ip_allowed,
             list_presets, save_preset, delete_preset, read_presets_file, import_presets, export_presets,
             test_connection, execute_query
         ])

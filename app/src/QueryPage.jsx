@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { OFFICIAL } from './edition.js'
 
 const base = p => (p || '').split(/[\\/]/).pop()
 
@@ -267,6 +268,7 @@ export default function QueryPage() {
 
   return (
     <div className="qwrap" onClick={() => setMenu(null)}>
+      {!OFFICIAL && (
       <aside className="qside">
         <button className="qnew" onClick={() => setConnModal({ name: '', jar: '', url: '', user: '', password: '' })}>＋ 新建连接</button>
         {conns.length === 0 && <div className="qside-empty">还没有连接配置</div>}
@@ -299,6 +301,7 @@ export default function QueryPage() {
           )
         })}
       </aside>
+      )}
 
       <section className="qmain">
         {javaInfo && !javaInfo.path && <JavaBanner onReady={setJavaInfo} />}

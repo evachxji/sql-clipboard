@@ -15,3 +15,6 @@ dist/
 app/src-tauri/bridge/classes/
 app/src-tauri/bridge/jdbc-bridge.jar
 test-libs/
+
+# 本地 IP 白名单配置（含内网地址，不入库）
+.env
