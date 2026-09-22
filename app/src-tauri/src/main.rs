@@ -449,9 +449,30 @@ fn pick_jar() -> String {
     let name = f.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "driver.jar".into());
     let dst = dir.join(&name);
     match std::fs::copy(&f, &dst) {
-        Ok(_) => dst.to_string_lossy().into_owned(),
+        // 存相对路径，随 exe 目录整体迁移
+        Ok(_) => format!("drivers/{}", name),
         Err(_) => f.to_string_lossy().into_owned(), // 复制失败则直接用原路径
     }
+}
+
+/// 解析驱动 jar 路径：原路径优先；相对路径按 exe 目录解析；
+/// 迁移后的旧绝对路径，按文件名到 drivers 目录光底查找
+fn resolve_jar(p: &str) -> String {
+    let path = PathBuf::from(p);
+    if path.is_absolute() && path.is_file() {
+        return p.into();
+    }
+    let cand = exe_dir().join(p);
+    if cand.is_file() {
+        return cand.to_string_lossy().into_owned();
+    }
+    if let Some(name) = Path::new(p).file_name() {
+        let cand = exe_dir().join("drivers").join(name);
+        if cand.is_file() {
+            return cand.to_string_lossy().into_owned();
+        }
+    }
+    p.into()
 }
 
 #[tauri::command]
@@ -656,7 +677,7 @@ fn check_ip_allowed() -> bool {
 #[tauri::command]
 async fn test_connection(jar: String, url: String, user: String, password: String) -> TestResult {
     tauri::async_runtime::spawn_blocking(move || {
-        let req = json!({"cmd": "test", "jar": jar, "url": url, "user": user, "password": password});
+        let req = json!({"cmd": "test", "jar": resolve_jar(&jar), "url": url, "user": user, "password": password});
         match bridge_call(req) {
             Ok(v) => TestResult {
                 ok: v["ok"].as_bool().unwrap_or(false),
@@ -680,7 +701,7 @@ async fn execute_query(jar: String, url: String, user: String, password: String,
 
 fn execute_query_blocking(jar: String, url: String, user: String, password: String, sql: String, params: Option<std::collections::HashMap<String, String>>) -> QueryResult {
     let fail = |e: String| QueryResult { ok: false, columns: vec![], rows: vec![], truncated: false, update_count: -1, elapsed_ms: 0, error: e };
-    let mut req = json!({"cmd": "query", "jar": jar, "url": url, "user": user, "password": password, "sql": sql, "maxRows": 1000});
+    let mut req = json!({"cmd": "query", "jar": resolve_jar(&jar), "url": url, "user": user, "password": password, "sql": sql, "maxRows": 1000});
     if let Some(p) = params {
         if !p.is_empty() {
             req["params"] = json!(p);
