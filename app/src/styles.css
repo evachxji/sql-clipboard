@@ -198,8 +198,10 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .java-line button{padding:4px 12px;border:1px solid var(--acc);border-radius:14px;background:var(--acc);
   color:#fff;font-size:11px;cursor:pointer}
 /* 连接弹窗：左下角测试连接 */
-.test-area{display:flex;align-items:center;gap:10px;min-width:0}
-.test-area .cc-status{margin-top:0;max-width:320px}
+.test-area{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.test-area .btn{flex-shrink:0;margin-left:0}
+.test-area .cc-status{margin-top:0;min-width:0}
+.actions>span:last-child{flex-shrink:0;display:flex}
 /* ===== 预设查询 ===== */
 .preset-head{display:flex;align-items:center;gap:10px}
 .sec-title{font-family:'Fraunces',serif;font-size:15px;font-weight:600}

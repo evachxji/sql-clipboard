@@ -53,6 +53,8 @@ public class JdbcBridge {
         ensureDriver(str(req.get("jar")));
         try (Connection c = DriverManager.getConnection(str(req.get("url")), str(req.get("user")), str(req.get("password")))) {
             resp.put("ok", c.isValid(5));
+            DatabaseMetaData md = c.getMetaData();
+            resp.put("dbInfo", md.getDatabaseProductName() + " " + md.getDatabaseProductVersion());
         }
     }
 
