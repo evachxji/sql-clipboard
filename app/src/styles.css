@@ -318,7 +318,7 @@ main{flex:1;overflow:auto;padding:18px 28px}
   --err:#e57368;--err-bg:#3a2522;--err-line:#5c3530}
 }
 /* ===== 设置浮窗（标题栏齿轮） ===== */
-.set-wrap{position:relative}
+.set-wrap{position:relative;display:flex;height:100%}
 .tb-btn.gear svg{transition:transform .25s}
 .tb-btn.gear.on{color:var(--acc);background:var(--acc-soft)}
 .tb-btn.gear.on svg{transform:rotate(35deg)}

@@ -16,8 +16,11 @@
 - **查询执行**：第二标签页，上传 JDBC 驱动 jar + 连接信息即可执行 SQL 并表格化展示结果，支持多组连接配置与连通性测试
 - **预设查询**：导入预设 SQL 后自动生成按钮，用户只需点击按钮、填写命名参数（:cust_no 等）条件值即可查询，无需写 SQL
 - **SQLite 持久化**：数据保存在 exe 同目录的 `sql_clipboard.db`，程序拷走数据跟着走
-- **便携单文件**：成品为单个 exe（约 9.5 MB），双击即用，无需安装
+- **便携单文件**：成品为单个 exe（约 12 MB），双击即用，无需安装
 - **离线可用**：界面字体全部内嵌打包，不依赖网络
+- **生成 select 快捷菜单**：文本格（复制值为空）右键一键生成 `select * from 表名` 查询格，可选「昨天」（`$zt`）或「拉链」（`start_etl_dt <= $zt and last_etl_dt > $zt`）条件
+- **系统托盘常驻**：右下角托盘图标左键显隐窗口；点 × 仅隐藏到托盘，彻底退出走托盘右键「退出」
+- **设置浮窗**：标题栏齿轮进入——开机自启、主题色（跟随系统 / 浅色 / 深色）、显隐全局快捷键
 
 ![编辑模式](designs/v2-edit.png)
 
@@ -41,12 +44,15 @@ npm run tauri build
 
 产物位于 `app/src-tauri/target/release/sql-clipboard.exe`。
 
-开发调试（热更新）：
+开发调试：
 
 ```bash
 cd app
-npm run tauri dev
+npm run tauri dev   # 桌面应用调试（加载 app/dist 静态产物；改前端后需先 npx vite build 才生效）
+npm run dev         # 仅前端浏览器预览（热更新，走 MOCK 数据）
 ```
+
+仓库根目录还有两个一键脚本（双击即用）：`start.cmd` 启动标准版本地开发服务；`package.cmd` 一键打包标准版 + 正式版两个 exe 到 `便携版\`（约 1~2 分钟）。
 
 ## 🔤 日期变量注入
 
@@ -108,6 +114,9 @@ SQL 复制值中可使用变量，**点击复制时自动替换为带单引号�
 │  ├─ src/               #   前端源码（界面、交互）
 │  └─ src-tauri/         #   Rust 后端（SQLite、剪贴板命令）
 ├─ designs/              # 三套 UI 设计方案（可交互 HTML 原型）与截图
+├─ tools/                # 辅助脚本（seed_example_data.py 写入示例数据）
+├─ start.cmd             # 一键启动本地开发服务（标准版）
+├─ package.cmd           # 一键打包两个版本 exe 到 便携版\
 └─ sql_clipboard.py      # 早期 Python + Tkinter 版本（已归档，仅供参考）
 ```
 

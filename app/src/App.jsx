@@ -312,7 +312,7 @@ export default function App() {
     <div className={editing ? 'app editing' : 'app'} onClick={() => { setMenu(null); setShowSet(false) }}>
       {ipBlock && (
         <div className="ip-block">
-          <button className="ipb-close" title="关闭" onClick={() => appWindow?.close()}>
+          <button className="ipb-close" title="关闭" onClick={() => invoke('quit_app')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
           <div className="ipb-card">
@@ -322,7 +322,7 @@ export default function App() {
             </div>
             <div className="ipb-title">网络连接失败</div>
             <div className="ipb-sub">请联系科技管理员</div>
-            <button className="ipb-exit" onClick={() => appWindow?.close()}>退出程序</button>
+            <button className="ipb-exit" onClick={() => invoke('quit_app')}>退出程序</button>
           </div>
         </div>
       )}
@@ -335,7 +335,7 @@ export default function App() {
               title="设置"
               onClick={e => { e.stopPropagation(); setShowSet(v => !v); setCapKey(false) }}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3.2" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>

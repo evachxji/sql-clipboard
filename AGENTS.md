@@ -31,6 +31,16 @@ npm run dev          # 仅前端 Vite（浏览器预览，走 MOCK 数据）
 - 日期变量仅 `$zt`（昨天）/ `$syd`（上月底），复制时替换为 `'yyyy-MM-dd'`
 - ⚠️ `app/src/App.jsx` 中部分中文注释/字符串为历史遗留乱码（双重编码），编辑时保持现状，不要「顺手修复」或改编码
 
+## Windows 终端编码避坑（必读）
+
+仓库文件统一为 UTF-8 无 BOM，但 Windows PowerShell 5.1 默认按 GBK 读写与显示，历史会话多次因此产生乱码`App.jsx` 曾因此出现 14 行注释被毁成字面 `?????`（不可逆，后已按代码语义重写）：
+
+- **终端里的“乱码”可能是显示假象**：`Get-Content` / `Select-String` 会把 UTF-8 文件按 GBK 显示成乱码。判定真实内容用 Python `open(path, encoding='utf-8')` 读取验证，不要凭终端输出下结论，更不要“顺手修复”
+- **禁止把含中文的脚本经管道传给 `python -`**：here-string 过管道会被按控制台代码页重编码，中文变成 `?`（0x3f），轻则替换静默失败（assert 报错但原因难查），重则把 `?` 写回文件造成永久数据丢失
+- **安全写法**：脚本放进 PowerShell 变量（内存中保持 Unicode），用 `[System.IO.File]::WriteAllText($path, $script, [System.Text.UTF8Encoding]::new($false))` 落成 UTF-8 无 BOM 临时脚本再执行；或把中文全部写成 `\uXXXX` 转义，保证脚本纯 ASCII
+- **写回文件保持原编码与换行**：Python 端用 `open(path, 'w', encoding='utf-8', newline='')`；不要用 PS 5.1 的 `Set-Content -Encoding UTF8`（会强加 BOM）
+- **打印中文验证结果**：给 Python 加 `sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')`，避免控制台 GBK 显示干扰判断
+
 ## Testing Guidelines
 
 本仓库暂无自动化测试框架。验收方式为手动验证：`npm run tauri dev` 启动后逐项确认功能（复制、右键菜单、编辑模式、筛选），UI 改动需截图存档到 `designs/`（命名 `v<编号>-<特性>.png`）。
@@ -50,6 +60,8 @@ npm run dev          # 仅前端 Vite（浏览器预览，走 MOCK 数据）
 
 ## 打包约定
 
+**一键脚本**：双击仓库根目录 `package.cmd` 自动完成下述两个版本的打包并复制到 `便携版\`（收尾自动把 dist 恢复为标准版前端）；双击 `start.cmd` 启动标准版本地开发服务。
+
 打包便携版 exe 时固定打 2 个版本，成品都复制到仓库根目录的 `便携版\` 目录下：
 
 1. **标准版**（功能完整，含「剪切板 / 查询执行」tab 栏与连接侧栏）：
@@ -62,3 +74,6 @@ npm run dev          # 仅前端 Vite（浏览器预览，走 MOCK 数据）
 - 正式版差异由 `app/src/edition.js` 的 `OFFICIAL` 常量控制（Vite 构建期内联），Rust 端通过 `option_env!("VITE_EDITION")` 识别版本
 - 正式版带 IP 白名单：仓库根目录 `.env` 的 `IP_WHITELIST`（逗号分隔 IPv4）由 `build.rs` 编译期注入；为空 = 不限制，配置后非白名单机器启动即拦截；改白名单需重打正式版
 - 两个 exe 放在同一目录（`便携版\`），运行时共用该目录下的 `sql_clipboard.db`
+- ⚠️ `tauri.conf.json` 未配置 `devUrl`，`tauri dev` 直接加载 `app/dist/` 静态产物：dist 是哪版的构建，dev 界面就是哪版。手动跑过 `build:official` 后须 `cd app; npx vite build` 恢复标准版 dist，否则 dev 会开出正式版界面
+- release 配置为 `lto = "thin"` + `codegen-units = 16`（打包全程 1~2 分钟）；fat LTO 只省约 1.3 MB 体积但打包需 10 分钟以上，不要改回
+- 窗口 × 为隐藏到系统托盘（不退出进程）；彻底退出 = 托盘右键「退出」或前端 `invoke('quit_app')`（IP 拦截页按钮）。`package.cmd` 覆盖 exe 前会自动 taskkill 同名进程，避免"窗口隐藏但进程锁定文件"导致打包失败

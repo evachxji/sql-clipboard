@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -735,6 +737,12 @@ fn execute_query_blocking(jar: String, url: String, user: String, password: Stri
     }
 }
 
+/// 彻底退出程序（前端 IP 拦截页等需要真正退出的场景调用；窗口 × 已被拦截为隐藏到托盘）
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 // ===================== 全局快捷键（显示/隐藏窗口） =====================
 
 fn toggle_main_window(app: &tauri::AppHandle) {
@@ -784,7 +792,43 @@ fn main() {
                 })
                 .build(),
         )
+        // 点 × 不退出，隐藏到托盘（托盘菜单「退出」/ quit_app 命令才真正退出）
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.hide();
+                api.prevent_close();
+            }
+        })
         .setup(|app| {
+            // 系统托盘：左键/菜单显隐窗口，右键菜单可彻底退出
+            // （窗口可被全局快捷键隐藏，托盘是此时唯一的退出入口，也避免进程残留锁定 exe）
+            let item_toggle = MenuItem::with_id(app, "toggle", "显示/隐藏", true, None::<&str>)?;
+            let item_quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&item_toggle, &item_quit])?;
+            let mut tray = TrayIconBuilder::new()
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .tooltip("SQL 剪切板")
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "toggle" => toggle_main_window(app),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        toggle_main_window(tray.app_handle());
+                    }
+                });
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            let _tray = tray.build(app)?;
+
             // 启动时恢复已保存的显隐快捷键
             if let Some(s) = get_setting("toggle_shortcut") {
                 if !s.trim().is_empty() {
@@ -799,7 +843,7 @@ fn main() {
             load_cells, add_cell, insert_cell, update_cell, delete_cell, reorder_row, copy_text,
             get_toggle_shortcut, set_toggle_shortcut,
             get_java_info, set_java_path, pick_jar,
-            save_connection, list_connections, delete_connection, check_ip_allowed,
+            save_connection, list_connections, delete_connection, check_ip_allowed, quit_app,
             list_presets, save_preset, delete_preset, read_presets_file, import_presets, export_presets,
             test_connection, execute_query
         ])
