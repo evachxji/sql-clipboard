@@ -779,6 +779,14 @@ fn set_toggle_shortcut(app: tauri::AppHandle, shortcut: String) -> Result<(), St
 
 fn main() {
     tauri::Builder::default()
+        // 单实例：再次双击 exe 时不启动新进程，改为把已运行实例的窗口唤到前台
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![]),
