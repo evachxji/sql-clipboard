@@ -1,6 +1,7 @@
 :root{
   --paper:#f6f2ea; --card:#fffdf7; --ink:#211d15; --mute:#8a8172;
   --line:#e4ddcd; --acc:#b3541e; --acc-soft:#f3e3d8; --blue:#2952cc;
+  --err:#b3261e; --err-bg:#fdeceb; --err-line:#ecc8c5;
 }
 *{box-sizing:border-box;margin:0;padding:0;font-family:'IBM Plex Sans','Microsoft YaHei',sans-serif}
 html,body,#root{height:100%}
@@ -144,7 +145,7 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .run-row .btn{margin-left:0}
 .run-conn{font-size:12px;color:var(--mute);font-family:'IBM Plex Mono',monospace;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.qerr{background:#fdeceb;border:1px solid #ecc8c5;color:#b3261e;border-radius:10px;
+.qerr{background:var(--err-bg);border:1px solid var(--err-line);color:var(--err);border-radius:10px;
   padding:10px 14px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;word-break:break-all;white-space:pre-wrap}
 .qinfo{background:#e8f5ee;border:1px solid #bfe3cf;color:#1e7d4f;border-radius:10px;padding:10px 14px;font-size:12.5px;flex-shrink:0}
 .result-wrap{flex:1;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;
@@ -304,4 +305,42 @@ main{flex:1;overflow:auto;padding:18px 28px}
 .cell.drop-hint,.note.drop-hint{outline:2px solid var(--acc);outline-offset:2px}
 /* 拖拽落点指示线：目标格左/右边缘的竖线 */
 .cell.drop-l,.note.drop-l{box-shadow:inset 3px 0 0 var(--acc)}
-.cell.drop-r,.note.drop-r{box-shadow:inset -3px 0 0 var(--acc)}
+.cell.drop-r,.note.drop-r{box-shadow:inset -3px 0 0 var(--acc)}
+/* ===== 深色主题：手动深色 + 跟随系统 ===== */
+:root[data-theme="dark"]{color-scheme:dark;
+  --paper:#1d1a14;--card:#29241a;--ink:#eae3d2;--mute:#9a917d;
+  --line:#3e3729;--acc:#d4834f;--acc-soft:#3d2f21;--blue:#8aa6f2;
+  --err:#e57368;--err-bg:#3a2522;--err-line:#5c3530}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){color-scheme:dark;
+    --paper:#1d1a14;--card:#29241a;--ink:#eae3d2;--mute:#9a917d;
+    --line:#3e3729;--acc:#d4834f;--acc-soft:#3d2f21;--blue:#8aa6f2;
+  --err:#e57368;--err-bg:#3a2522;--err-line:#5c3530}
+}
+/* ===== 设置浮窗（标题栏齿轮） ===== */
+.set-wrap{position:relative}
+.tb-btn.gear svg{transition:transform .25s}
+.tb-btn.gear.on{color:var(--acc);background:var(--acc-soft)}
+.tb-btn.gear.on svg{transform:rotate(35deg)}
+.set-panel{position:absolute;top:calc(100% + 6px);right:0;width:266px;z-index:60;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px 14px;
+  box-shadow:0 18px 44px rgba(33,29,21,.22);animation:set-in .18s cubic-bezier(.2,.8,.2,1)}
+@keyframes set-in{from{transform:translateY(-6px);opacity:0}}
+.set-title{font-family:'Fraunces','Microsoft YaHei',serif;font-size:16px;font-weight:700;margin-bottom:2px}
+.set-label{font-size:10.5px;letter-spacing:1.5px;color:var(--mute);font-weight:600;margin:12px 0 6px}
+.set-row{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.mini-tg{width:38px;height:21px;border-radius:20px;border:1.5px solid var(--ink);position:relative;cursor:pointer;transition:.2s;flex-shrink:0}
+.mini-tg i{position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--ink);transition:.2s}
+.mini-tg.on{background:var(--ink)}
+.mini-tg.on i{left:19px;background:var(--card)}
+.set-seg{display:flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:24px;padding:3px}
+.set-seg button{flex:1;border:none;background:none;padding:5px 0;border-radius:20px;font-size:12px;
+  font-family:inherit;color:var(--ink);cursor:pointer;transition:.15s}
+.set-seg button.on{background:var(--ink);color:var(--paper);font-weight:600}
+.set-seg button:not(.on):hover{color:var(--acc)}
+.set-key{border:1.5px dashed var(--line);border-radius:8px;padding:8px 12px;font-size:12.5px;text-align:center;
+  cursor:pointer;color:var(--mute);outline:none;transition:.15s;font-family:'IBM Plex Mono',monospace}
+.set-key:hover{border-color:var(--acc);color:var(--ink)}
+.set-key.cap{border-style:solid;border-color:var(--acc);color:var(--acc);background:var(--acc-soft)}
+.set-hint{font-size:11px;color:var(--mute);margin-top:6px;text-align:center}
+.set-err{font-size:11.5px;color:#b3261e;margin-top:6px;text-align:center}

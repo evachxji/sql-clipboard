@@ -67,6 +67,61 @@ export default function App() {
   const dragRow = useRef(null)                 // 拖拽开始时所在行
   const origOrder = useRef(null)               // 拖拽开始时该行 id 顺序（取消拖拽时还原）
   const [query, setQuery] = useState('')
+
+  // ===== 设置浮窗：开机自启 / 主题色 / 显隐快捷键 =====
+  const [showSet, setShowSet] = useState(false)
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'system') // 默认跟随系统
+  const [autoStart, setAutoStart] = useState(false)
+  const [shortcut, setShortcut] = useState('')
+  const [capKey, setCapKey] = useState(false) // 正在录入快捷键
+  const [scErr, setScErr] = useState('')
+
+  // 主题色：写入 <html data-theme>，system 时交给 prefers-color-scheme
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  // 启动时同步开机自启与显隐快捷键的实际状态
+  useEffect(() => {
+    if (!isTauri) return
+    invoke('plugin:autostart|is_enabled').then(v => setAutoStart(!!v)).catch(() => {})
+    invoke('get_toggle_shortcut').then(v => setShortcut(v || '')).catch(() => {})
+  }, [])
+
+  const toggleAutoStart = async () => {
+    const next = !autoStart
+    setAutoStart(next)
+    if (isTauri) {
+      try { await invoke(next ? 'plugin:autostart|enable' : 'plugin:autostart|disable') }
+      catch { setAutoStart(!next) } // 失败回滚
+    }
+  }
+
+  const saveShortcut = async acc => {
+    setScErr('')
+    if (!isTauri) { setShortcut(acc); return }
+    try {
+      await invoke('set_toggle_shortcut', { shortcut: acc })
+      setShortcut(acc)
+    } catch (e) {
+      setScErr(String(e))
+    }
+  }
+  const filterRef = useRef(null)
+
+  // Ctrl+F 聚焦筛选输入框（拦截浏览器默认搜索框）
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F') && tab === 'clip') {
+        e.preventDefault()
+        filterRef.current?.focus()
+        filterRef.current?.select()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [tab])
   const [level, setLevel] = useState(() => {
     const v = parseInt(localStorage.getItem('fontLevel'))
     return [0, 1, 2].includes(v) ? v : 1 // 默认中档
@@ -231,8 +286,8 @@ export default function App() {
   }
 
   // 生成select：以显示值为表名生成查询 SQL，右侧新增「查询」单元格
-  const genSelect = (cell, yesterday) =>
-    insertRight(cell, '查询', `select * from ${cell.display}${yesterday ? ' where data_date = $zt' : ''};`)
+  const genSelect = (cell, where) =>
+    insertRight(cell, '查询', `select * from ${cell.display}${where};`)
 
   const addRow = async () => {
     const row = cells.length ? Math.max(...cells.map(c => c.row)) + 1 : 0
@@ -254,7 +309,7 @@ export default function App() {
   }
 
   return (
-    <div className={editing ? 'app editing' : 'app'} onClick={() => setMenu(null)}>
+    <div className={editing ? 'app editing' : 'app'} onClick={() => { setMenu(null); setShowSet(false) }}>
       {ipBlock && (
         <div className="ip-block">
           <button className="ipb-close" title="关闭" onClick={() => appWindow?.close()}>
@@ -274,6 +329,26 @@ export default function App() {
       <div className="titlebar" data-tauri-drag-region onDoubleClick={() => appWindow?.toggleMaximize()}>
         <span className="tb-title" data-tauri-drag-region>SQL 剪切板</span>
         <div className="tb-btns" onDoubleClick={e => e.stopPropagation()}>
+          <div className="set-wrap">
+            <button
+              className={showSet ? 'tb-btn gear on' : 'tb-btn gear'}
+              title="设置"
+              onClick={e => { e.stopPropagation(); setShowSet(v => !v); setCapKey(false) }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3.2" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+            {showSet && (
+              <SettingsPanel
+                auto={autoStart} onToggleAuto={toggleAutoStart}
+                theme={theme} onTheme={setTheme}
+                shortcut={shortcut} capturing={capKey} setCapturing={setCapKey}
+                onSaveShortcut={saveShortcut} err={scErr}
+              />
+            )}
+          </div>
           <button
             className={pinned ? 'tb-btn pin on' : 'tb-btn pin'}
             title={pinned ? '取消置顶' : '置顶（窗口不被遮挡）'}
@@ -312,6 +387,7 @@ export default function App() {
         {tab === 'clip' && (<>
         <div className="f-wrap">
           <input
+            ref={filterRef}
             className="filter"
             placeholder="筛选显示值…"
             value={query}
@@ -417,8 +493,9 @@ export default function App() {
         >
           <button onClick={() => { setModal({ ...menu.cell }); setMenu(null) }}>编辑</button>
           {!hasCopy(menu.cell) && (<>
-            <button onClick={() => genSelect(menu.cell, false)}>生成select</button>
-            <button onClick={() => genSelect(menu.cell, true)}>生成select（昨天）</button>
+            <button onClick={() => genSelect(menu.cell, '')}>生成select</button>
+            <button onClick={() => genSelect(menu.cell, ' where data_date = $zt')}>生成select（昨天）</button>
+            <button onClick={() => genSelect(menu.cell, ' where start_etl_dt <= $zt and last_etl_dt > $zt')}>生成select（拉链）</button>
           </>)}
           <button onClick={() => insertRight(menu.cell, menu.cell.display, menu.cell.copy)}>复制</button>
           <button className="danger" onClick={() => deleteCell(menu.cell)}>删除</button>
@@ -465,6 +542,62 @@ function EditBox({ cell, onSave, onDelete, onClose }) {
           <button className="btn save" disabled={empty} onClick={() => onSave(display.trim(), copy)}>保存</button>
         </span>
       </div>
+    </div>
+  )
+}
+// 全局快捷键录入时的按键名归一（tauri global-shortcut 解析格式）
+const HOTKEY_MAP = {
+  ' ': 'Space', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+}
+
+function SettingsPanel({ auto, onToggleAuto, theme, onTheme, shortcut, capturing, setCapturing, onSaveShortcut, err }) {
+  const onKeyDown = e => {
+    if (!capturing) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.key === 'Escape') { setCapturing(false); return }
+    if (e.key === 'Backspace' || e.key === 'Delete') { onSaveShortcut(''); setCapturing(false); return }
+    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return // 等完整组合键
+    const mods = []
+    if (e.ctrlKey) mods.push('Ctrl')
+    if (e.altKey) mods.push('Alt')
+    if (e.shiftKey) mods.push('Shift')
+    if (e.metaKey) mods.push('Super')
+    const key = HOTKEY_MAP[e.key] || (e.key.length === 1 ? e.key.toUpperCase() : e.key)
+    onSaveShortcut([...mods, key].join('+'))
+    setCapturing(false)
+  }
+  return (
+    <div className="set-panel" onClick={e => e.stopPropagation()}>
+      <div className="set-title">设置</div>
+      <div className="set-label">启动</div>
+      <div className="set-row">
+        <span>开机自启动</span>
+        <div
+          className={auto ? 'mini-tg on' : 'mini-tg'}
+          role="checkbox" aria-checked={auto} tabIndex={0}
+          onClick={onToggleAuto}
+          onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onToggleAuto()}
+        ><i /></div>
+      </div>
+      <div className="set-label">主题色</div>
+      <div className="set-seg">
+        {[['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']].map(([v, t]) => (
+          <button key={v} className={theme === v ? 'on' : ''} onClick={() => onTheme(v)}>{t}</button>
+        ))}
+      </div>
+      <div className="set-label">显示 / 隐藏窗口快捷键</div>
+      <div
+        className={capturing ? 'set-key cap' : 'set-key'}
+        tabIndex={0}
+        onClick={() => setCapturing(true)}
+        onKeyDown={onKeyDown}
+        onBlur={() => setCapturing(false)}
+      >
+        {capturing ? '按下组合键…' : (shortcut || '未设置 · 点击录入')}
+      </div>
+      <div className="set-hint">Esc 取消录入 · Backspace 清除快捷键</div>
+      {err && <div className="set-err">{err}</div>}
     </div>
   )
 }

@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
+use tauri::Manager;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 // ===================== 数据结构 =====================
 
@@ -733,10 +735,69 @@ fn execute_query_blocking(jar: String, url: String, user: String, password: Stri
     }
 }
 
+// ===================== 全局快捷键（显示/隐藏窗口） =====================
+
+fn toggle_main_window(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        match w.is_visible() {
+            Ok(true) => {
+                let _ = w.hide();
+            }
+            _ => {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }
+    }
+}
+
+#[tauri::command]
+fn get_toggle_shortcut() -> String {
+    get_setting("toggle_shortcut").unwrap_or_default()
+}
+
+/// 设置全局显隐快捷键：空串表示清除；持久化到 settings 表
+#[tauri::command]
+fn set_toggle_shortcut(app: tauri::AppHandle, shortcut: String) -> Result<(), String> {
+    app.global_shortcut().unregister_all().map_err(|e| e.to_string())?;
+    let s = shortcut.trim();
+    if !s.is_empty() {
+        let sc: Shortcut = s.parse().map_err(|_| format!("无效快捷键: {s}"))?;
+        app.global_shortcut().register(sc).map_err(|e| e.to_string())?;
+    }
+    set_setting("toggle_shortcut", s)
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![]),
+        ))
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        toggle_main_window(app);
+                    }
+                })
+                .build(),
+        )
+        .setup(|app| {
+            // 启动时恢复已保存的显隐快捷键
+            if let Some(s) = get_setting("toggle_shortcut") {
+                if !s.trim().is_empty() {
+                    if let Ok(sc) = s.parse::<Shortcut>() {
+                        let _ = app.global_shortcut().register(sc);
+                    }
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             load_cells, add_cell, insert_cell, update_cell, delete_cell, reorder_row, copy_text,
+            get_toggle_shortcut, set_toggle_shortcut,
             get_java_info, set_java_path, pick_jar,
             save_connection, list_connections, delete_connection, check_ip_allowed,
             list_presets, save_preset, delete_preset, read_presets_file, import_presets, export_presets,
